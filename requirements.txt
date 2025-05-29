@@ -1,0 +1,9 @@
+Flask
+Flask-SocketIO
+python-engineio
+python-socketio
+simple-websocket
+pyserial
+Flask-Cors
+# За OPC UA (когато го добавите):
+# asyncua
