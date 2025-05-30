@@ -1,20 +1,22 @@
 {
     "appTitle": "АСМг - Център за Управление",
     "mainHeader": "Информационно Табло на Линията",
-    "status.running": "Работи",
-    "status.stopped": "Спряна",
-    "status.error": "Грешка",
-    "status.warning": "Предупреждение",
-    "status.idle": "Изчакване",
-    "status.ok": "ОК",
-    "status.working": "В действие",
-    "status.okFull": "ОК (Пълна)",
-    "status.almostFull": "Почти пълна",
-    "status.empty": "Празна",
-    "status.maintenance": "Поддръжка",
-    "status.waitingForLoad": "Чака зареждане",
-    "status.waitingForUnload": "Чака разтоварване",
-    "status.disconnected": "Прекъсната връзка",
+    "status": {
+        "running": "Работи",
+        "stopped": "Спряна",
+        "error": "Грешка",
+        "warning": "Предупреждение",
+        "idle": "Изчакване",
+        "ok": "ОК",
+        "working": "В действие",
+        "okFull": "ОК (Пълна)",
+        "almostFull": "Почти пълна",
+        "empty": "Празна",
+        "maintenance": "Поддръжка",
+        "waitingForLoad": "Чака зареждане",
+        "waitingForUnload": "Чака разтоварване",
+        "disconnected": "Прекъсната връзка"
+    },
     "task": {
         "scanOperator": "Сканирай бадж на оператор",
         "scanTravelLot": "Сканирай маршрутна карта",
@@ -78,19 +80,23 @@
     "logSection": {
         "title": "Системни Съобщения"
     },
-    "socket.connected": "Успешно свързване със сървъра.",
-    "log.comPortOpened": "COM порт {port} е отворен успешно.",
-    "log.comPortOpenError": "Грешка при отваряне на COM порт {port}: {error}",
-    "log.comPortClosed": "COM порт {port} е затворен.",
-    "log.barcodeReceived": "Получен баркод: {barcodeData}",
-    "log.operatorLoggedIn": "Оператор {operator_name} влезе в системата.",
-    "log.operatorLoggedOut": "Оператор излезе от системата.",
-    "log.validatingOperator": "Валидиране на операторски бадж: {badge_id}",
-    "log.operatorApiValidationFailed": "API валидацията на оператор неуспешна: {error}",
-    "log.operatorApiError": "Грешка при комуникация с API за операторски бадж {badge_id}",
-    "log.travelLotIdentified": "Пътна карта идентифицирана: {lot_id}, Изделие: {item_number}",
-    "log.travelCardCleared": "Данните за пътната карта са изчистени.",
-    "log.simulatorInitialized": "Симулаторът на данни е инициализиран.",
-    "log.simulatorStarted": "Симулаторът на данни е стартиран.",
-    "log.simulatorStopping": "Симулаторът на данни спира."
+    "socket": {
+        "connected": "Успешно свързване със сървъра."
+    },
+    "log": {
+        "comPortOpened": "COM порт {port} е отворен успешно.",
+        "comPortOpenError": "Грешка при отваряне на COM порт {port}: {error}",
+        "comPortClosed": "COM порт {port} е затворен.",
+        "barcodeReceived": "Получен баркод: {barcodeData}",
+        "operatorLoggedIn": "Оператор {operator_name} влезе в системата.",
+        "operatorLoggedOut": "Оператор излезе от системата.",
+        "validatingOperator": "Валидиране на операторски бадж: {badge_id}",
+        "operatorApiValidationFailed": "API валидацията на оператор неуспешна: {error}",
+        "operatorApiError": "Грешка при комуникация с API за операторски бадж {badge_id}",
+        "travelLotIdentified": "Пътна карта идентифицирана: {lot_id}, Изделие: {item_number}",
+        "travelCardCleared": "Данните за пътната карта са изчистени.",
+        "simulatorInitialized": "Симулаторът на данни е инициализиран.",
+        "simulatorStarted": "Симулаторът на данни е стартиран.",
+        "simulatorStopping": "Симулаторът на данни спира."
+    }
 }
