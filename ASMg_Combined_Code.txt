@@ -1,0 +1,2308 @@
+--- START FILE: .\.gitignore ---
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# IDE / Editor specific
+.idea/
+.vscode/
+*.swp
+*~
+
+# OS specific
+.DS_Store
+Thumbs.db
+
+# Logs
+*.log
+logs/
+*.log.*
+
+# Node modules (if you decide to use npm for frontend tools later)
+node_modules/
+dist/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+
+
+--- END FILE: .\.gitignore ---
+
+--- START FILE: .\README.md ---
+
+# ASMg - Production Line Control Center
+
+Това е уеб-базирано приложение за мониторинг и контрол на производствена линия, разработено с Flask, Socket.IO и Jinja2.
+
+## Изисквания
+
+* Python 3.8+
+* pip
+
+## Инсталация
+
+1.  Клонирайте репозиторито (или създайте файловете ръчно):
+    ```bash
+    git clone <your-repo-url> ASMg
+    cd ASMg
+    ```
+
+2.  Създайте и активирайте виртуална среда (препоръчително):
+    ```bash
+    python -m venv .venv
+    # За Windows
+    .\.venv\Scripts\activate
+    # За Linux/macOS
+    # source .venv/bin/activate
+    ```
+
+3.셔 Инсталирайте зависимостите:
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+## Конфигурация
+
+Конфигурационните настройки се намират във файла `backend/config.py`. Можете да промените:
+* `BARCODE_SCANNER_PORT`: COM портът за баркод скенера (напр. 'COM4').
+* `OPCUA_SERVER_URL`: URL на OPC UA сървъра (за бъдеща интеграция).
+* `DEBUG`: `True` за режим на разработка, `False` за продукция.
+* `PORT`, `HOST`: Порт и хост, на които да слуша сървърът.
+* `SUPPORTED_LANGUAGES`, `DEFAULT_LANGUAGE`: За многоезичност.
+
+## Стартиране на приложението
+
+От коренната директория на проекта (`ASMg/`):
+```bash
+python run.py
+
+--- END FILE: .\README.md ---
+
+--- START FILE: .\requirements.txt ---
+
+Flask
+Flask-SocketIO
+python-engineio
+python-socketio
+simple-websocket
+pyserial
+Flask-Cors
+# За OPC UA (когато го добавите):
+# asyncua
+
+--- END FILE: .\requirements.txt ---
+
+--- START FILE: .\run.py ---
+
+import os
+import sys
+import socket # Добавен за получаване на IP адрес
+import webbrowser # Добавен за отваряне на браузъра
+import threading # Добавен за отваряне на браузъра след стартиране на сървъра
+import time # Добавен за забавяне преди отваряне на браузъра
+
+project_root = os.path.abspath(os.path.dirname(__file__))
+if project_root not in sys.path:
+    sys.path.insert(0, project_root)
+
+print(f"DEBUG: [run.py] project_root is {project_root}")
+# print(f"DEBUG: [run.py] sys.path is {sys.path}") # Може да се разкоментира при нужда
+
+print("DEBUG: [run.py] Преди импортиране на backend.app")
+try:
+    # Импортираме инстанциите, които са създадени на модулно ниво в backend/app.py
+    from backend.app import app, socketio, com_port_scanner, data_simulator
+    from backend.config import Config
+    print("DEBUG: [run.py] Успешно импортиране на backend.app, app и socketio, com_port_scanner, data_simulator, Config")
+except ImportError as e:
+    print(f"DEBUG: [run.py] Грешка при импорт (ImportError): {e}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+except Exception as e_gen:
+    print(f"DEBUG: [run.py] Неочаквана грешка при импорт (Exception): {e_gen}")
+    import traceback
+    traceback.print_exc()
+    sys.exit(1)
+
+def get_local_ip():
+    """Опитва се да намери локалния IP адрес на машината."""
+    s = None
+    try:
+        s = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+        s.settimeout(0.1) # Намаляваме таймаута
+        # Използваме DNS сървър на Google, който е вероятно да е достъпен
+        s.connect(('8.8.8.8', 1))
+        ip = s.getsockname()[0]
+    except Exception:
+        ip = '127.0.0.1' # Fallback
+    finally:
+        if s:
+            s.close()
+    return ip
+
+def open_browser(url, delay):
+    """Отваря URL в браузъра след определено забавяне."""
+    def _open():
+        time.sleep(delay)
+        print(f"DEBUG: [run.py] Опит за отваряне на браузъра с URL: {url}")
+        webbrowser.open_new_tab(url)
+    threading.Thread(target=_open, daemon=True).start()
+
+if __name__ == '__main__':
+    print(f"DEBUG: [run.py] Влизане в if __name__ == '__main__':")
+    print(f"Стартиране на {getattr(Config, 'APP_NAME', 'ASMg')} приложението...")
+
+    port = getattr(Config, 'PORT', 5000)
+    debug_mode = getattr(Config, 'DEBUG', True)
+    host_setting = getattr(Config, 'HOST', '0.0.0.0')
+
+    local_ip = get_local_ip()
+    app_url_local = f"http://localhost:{port}"
+    app_url_network = f"http://{local_ip}:{port}"
+
+    print("-" * 40)
+    print(f" {getattr(Config, 'APP_NAME', 'ASMg')} Application Starting ")
+    print("-" * 40)
+    print(f"  * Debug mode: {'on' if debug_mode else 'off'}")
+    print(f"  * Configured COM Port: {Config.BARCODE_SCANNER_PORT} at {Config.BARCODE_SCANNER_BAUDRATE} baud")
+    print(f"  * Running on: http://{host_setting}:{port}")
+    print(f"  * Достъпно на (локално): {app_url_local}")
+    if host_setting == '0.0.0.0' and local_ip != '127.0.0.1':
+        print(f"  * Достъпно в мрежата на: {app_url_network}")
+    print("-" * 40)
+    print("Натиснете CTRL+C за спиране на сървъра.")
+
+    # Опитваме да отворим COM порта преди стартиране на сървъра
+    if com_port_scanner:
+        print("DEBUG: [run.py] Опит за отваряне на COM порт...")
+        if not com_port_scanner.open_port():
+            print(f"ПРЕДУПРЕЖДЕНИЕ: Неуспешно отваряне на COM порт {Config.BARCODE_SCANNER_PORT}. Баркод скенерът няма да работи.")
+        else:
+            print(f"DEBUG: [run.py] COM порт {Config.BARCODE_SCANNER_PORT} е отворен.")
+
+    # Стартираме симулатора на данни, ако е в debug режим
+    if Config.DEBUG and data_simulator:
+        print("DEBUG: [run.py] Стартиране на DataSimulatorThread...")
+        data_simulator.start()
+
+    if debug_mode and not os.environ.get("WERKZEUG_RUN_MAIN"):
+        open_browser(app_url_local, 2)
+
+    try:
+        socketio.run(app,
+                     host=host_setting,
+                     port=port,
+                     debug=debug_mode,
+                     use_reloader=False, # Оставяме го False, за да избегнем проблема с рестартирането
+                     allow_unsafe_werkzeug=True)
+    except KeyboardInterrupt:
+        print("DEBUG: [run.py] Сървърът е спрян ръчно (CTRL+C).")
+    except Exception as e:
+        print(f"DEBUG: [run.py] Грешка при стартиране или работа на socketio: {e}")
+        import traceback
+        traceback.print_exc()
+    finally:
+        print("DEBUG: [run.py] Изпълнява се finally блокът в run.py.")
+        if com_port_scanner and com_port_scanner.is_running:
+            print("DEBUG: [run.py] Затваряне на COM порт...")
+            com_port_scanner.close_port()
+        if data_simulator and data_simulator.is_alive():
+            print("DEBUG: [run.py] Спиране на симулатора на данни...")
+            data_simulator.stop()
+            data_simulator.join(timeout=2) # Даваме малко повече време за приключване
+        print("DEBUG: [run.py] Програмата приключи.")
+
+    print("DEBUG: [run.py] socketio.run() завърши.")
+
+--- END FILE: .\run.py ---
+
+--- START FILE: .\Asmg.bat ---
+
+@echo off
+REM Скрипт за създаване на структурата на проекта ASMg
+
+REM Създаване на основната папка на проекта
+IF NOT EXIST ASMg (
+    ECHO Creating project directory: ASMg
+    mkdir ASMg
+) ELSE (
+    ECHO Directory ASMg already exists.
+)
+cd ASMg
+
+REM --- Създаване на Backend структурата ---
+ECHO Creating backend directories...
+IF NOT EXIST backend mkdir backend
+cd backend
+
+IF NOT EXIST api mkdir api
+IF NOT EXIST services mkdir services
+IF NOT EXIST translations mkdir translations
+IF NOT EXIST utils mkdir utils
+
+ECHO Creating backend files...
+type NUL > __init__.py
+type NUL > app.py
+type NUL > config.py
+
+cd api
+type NUL > __init__.py
+type NUL > operator_routes.py
+type NUL > travel_lot.py
+type NUL > machine_status.py
+cd ..
+
+cd services
+type NUL > __init__.py
+type NUL > com_port_manager.py
+type NUL > data_simulator.py
+type NUL > opc_ua_client.py
+cd ..
+
+cd translations
+type NUL > __init__.py
+type NUL > translation_manager.py
+type NUL > bg.json
+type NUL > en.json
+type NUL > sr.json
+cd ..
+
+cd utils
+type NUL > __init__.py
+type NUL > logger.py
+cd ..
+
+cd ..
+REM --- Край на Backend структурата ---
+
+REM --- Създаване на templates структурата (за Jinja2) ---
+ECHO Creating templates directory...
+IF NOT EXIST templates mkdir templates
+cd templates
+
+ECHO Creating template files...
+type NUL > index.html
+
+cd ..
+REM --- Край на templates структурата ---
+
+REM --- Създаване на static структурата (за CSS, JS, изображения) ---
+ECHO Creating static directories...
+IF NOT EXIST static mkdir static
+cd static
+
+IF NOT EXIST css mkdir css
+IF NOT EXIST js mkdir js
+IF NOT EXIST img mkdir img
+
+cd css
+ECHO Creating static CSS files...
+type NUL > style.css
+cd ..
+
+cd js
+ECHO Creating static JS files...
+type NUL > main_app.js
+cd ..
+
+cd ..
+REM --- Край на static структурата ---
+
+REM --- Създаване на файлове в коренната директория на проекта ---
+ECHO Creating root project files...
+type NUL > .gitignore
+type NUL > README.md
+type NUL > requirements.txt
+type NUL > run.py
+
+cd ..
+ECHO Project structure for ASMg created successfully!
+pause
+
+--- END FILE: .\Asmg.bat ---
+
+--- START FILE: .\backend\__init__.py ---
+
+# Празен файл, маркиращ директорията като пакет
+
+--- END FILE: .\backend\__init__.py ---
+
+--- START FILE: .\backend\app.py ---
+
+# Файл: ASMg/backend/app.py
+
+import os
+import json
+import time
+import logging
+from logging.handlers import RotatingFileHandler
+
+from flask import Flask, render_template, request, session, redirect, url_for
+from flask_socketio import SocketIO, emit
+from flask_cors import CORS
+
+from backend.config import Config
+from backend.translations.translation_manager import load_translations, get_translation
+from backend.services.traceability_api import TraceabilityAPI
+
+# --- Конфигурация на Логването (ЗАПАЗВАМЕ ВАШАТА, ОТЛИЧНА Е) ---
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG if Config.DEBUG else logging.INFO)
+log_file_path = os.path.join(os.path.dirname(os.path.dirname(__file__)), 'asmg_app.log')
+file_handler = RotatingFileHandler(log_file_path, maxBytes=1024 * 1024 * 5, backupCount=5, encoding='utf-8')
+file_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+file_handler.setFormatter(file_formatter)
+logger.addHandler(file_handler)
+logger.info("Приложението ASMg се стартира...")
+
+# --- Глобални Променливи (с възстановена пълна структура) ---
+global_line_status_data =\
+{
+    "current_operator": None,
+    "current_travel_lot": None,
+    "overall_status": "status.idle",
+    "robots": {
+        "1": {"status": "status.idle"}, "2": {"status": "status.idle"}, "3": {"status": "status.idle"}
+    },
+    "turntable1": {
+        "1": {"status": "status.idle", "moduleId": "--", "time": 0},
+        "2": {"status": "status.idle", "moduleId": "--", "time": 0},
+        "3": {"status": "status.idle", "moduleId": "--", "time": 0},
+        "4": {"status": "status.idle", "moduleId": "--", "time": 0}
+    },
+    '''
+    "turntable2": {
+        "1": {"status": "status.idle", "moduleIds": [], "time": 0, "progress": 0},
+        "2": {"status": "status.idle", "moduleIds": [], "time": 0, "progress": 0},
+        "3": {"status": "status.idle", "moduleIds": [], "time": 0, "progress": 0},
+        "4": {"status": "status.idle", "moduleIds": [], "time": 0, "progress": 0}
+    },'''
+    "trays": {
+        "in": {"status": "status.empty"}, "out": {"status": "status.empty"}
+    }
+}
+
+# --- Инициализация на Приложението (ОСТАВА СЪЩАТА) ---
+template_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'templates'))
+static_dir = os.path.abspath(os.path.join(os.path.dirname(__file__), '..', 'static'))
+app = Flask(__name__, template_folder=template_dir, static_folder=static_dir)
+app.config.from_object(Config)
+socketio = SocketIO(app, cors_allowed_origins="*")
+CORS(app, resources={r"/*": {"origins": "*"}})
+
+# --- Зареждане на Преводи и API Клиент (ОСТАВАТ СЪЩИТЕ) ---
+translations_path = os.path.join(os.path.dirname(__file__), 'translations')
+translation_data = load_translations(translations_path)
+traceability_api_client = TraceabilityAPI(
+    base_url=Config.TRACEABILITY_API_URL,
+    api_key=Config.TRACEABILITY_API_KEY,
+    logger_func=logger
+)
+
+
+# --- Помощни Функции ---
+# ПРЕМАХВАМЕ update_operator_status_app и get_current_operator_app.
+# Тяхната логика ще се поеме от новите SocketIO хендлъри.
+# Функцията add_log_message остава, тъй като е полезна.
+# --- Помощни Функции ---
+def add_log_message(message_key, level='info', **kwargs):
+    """
+    КОРИГИРАНА ВЕРСИЯ: Тази функция вече е безопасна за извикване отвсякъде.
+    """
+    lang_code = Config.DEFAULT_LANGUAGE
+
+    # --- ТОВА Е КЛЮЧОВАТА ПРОМЯНА ---
+    try:
+        # Опитваме се да достъпим 'session', само ако сме в контекста на заявка.
+        if request:
+            lang_code = session.get('language', Config.DEFAULT_LANGUAGE)
+    except RuntimeError:
+        # Ако получим грешка 'Working outside of request context',
+        # ние я "хващаме" и просто продължаваме, използвайки езика по подразбиране.
+        # logger.debug("add_log_message извикана извън контекст, използва се език по подразбиране.")
+        pass
+
+    message_template = get_translation(message_key, lang_code, translation_data, fallback_lang=Config.DEFAULT_LANGUAGE)
+
+    # Използваме try-except и за форматирането, за да избегнем други грешки
+    try:
+        final_message = message_template.format(**kwargs)
+    except KeyError:
+        final_message = message_template  # Връщаме шаблона, ако липсва ключ за форматиране
+
+    log_level_map = {'debug': logging.DEBUG, 'info': logging.INFO, 'success': logging.INFO, 'warning': logging.WARNING,
+                     'error': logging.ERROR}
+    logger.log(log_level_map.get(level.lower(), logging.INFO), f"UI LOG [{lang_code.upper()}]: {final_message}")
+
+    # Изпращаме съобщението към всички свързани клиенти
+    socketio.emit('log_message', {'message': final_message, 'level': level})
+
+
+# --- Инициализация на услугите ---
+from backend.services.com_port_manager import ComPortManager
+
+# КЛЮЧОВА ПРОМЯНА: Инициализираме ComPortManager с новия, прост конструктор.
+com_port_scanner = ComPortManager(
+    port=Config.BARCODE_SCANNER_PORT,
+    baudrate=Config.BARCODE_SCANNER_BAUDRATE,
+    socketio=socketio
+)
+logger.info(f"ComPortManager инициализиран за порт {Config.BARCODE_SCANNER_PORT} с новата опростена архитектура.")
+
+# Симулаторът остава същият за момента
+from backend.services.data_simulator import DataSimulatorThread
+
+data_simulator = DataSimulatorThread(socketio, global_line_status_data, add_log_message)
+logger.info("DataSimulatorThread инициализиран.")
+
+# --- Регистриране на API Маршрути ---
+from backend.api import register_api_routes
+
+# ВАЖНО: Премахваме последния аргумент update_operator_status_app, тъй като функцията вече не съществува
+register_api_routes(app, socketio, global_line_status_data, translation_data)
+logger.info("API маршрутите са регистрирани.")
+
+
+# Файл: backend/app.py
+
+@app.route('/')
+def index():
+    logger.debug(f"Заявка към '/' от {request.remote_addr}. Сесия: {session}")
+    lang_code = session.get('language', Config.DEFAULT_LANGUAGE)
+    current_translations = translation_data.get(lang_code, translation_data.get(Config.DEFAULT_LANGUAGE, {}))
+
+    # --- ТОВА Е КОРЕКЦИЯТА ---
+    # Подаваме към темплейта началната структура на данните, за да може
+    # Jinja2 да рендира правилно всички панели, дори и да са празни.
+    initial_render_data = {
+        "overall_status": global_line_status_data.get("overall_status", "status.idle"),
+        "robots": global_line_status_data.get("robots", {}),
+        "turntable1": global_line_status_data.get("turntable1", {}),
+        "turntable2": global_line_status_data.get("turntable2", {}),
+        "trays": global_line_status_data.get("trays", {})
+    }
+
+    return render_template('index.html',
+                           translations=current_translations,
+                           current_lang=lang_code,
+                           supported_languages=Config.SUPPORTED_LANGUAGES,
+                           initial_data=initial_render_data)  # Връщаме initial_data
+
+
+@app.route('/set_language/<lang_code>')
+def set_language_route(lang_code):
+    # Тази функция остава същата.
+    if lang_code in Config.SUPPORTED_LANGUAGES:
+        session['language'] = lang_code
+    return redirect(url_for('index'))
+
+
+# --- SocketIO Събития ---
+# ПРОМЕНЯМЕ ЛОГИКАТА ТУК
+
+# Добавяме флаг, за да сме сигурни, че стартираме нишката само веднъж
+com_reader_started = False
+
+
+@socketio.on('connect')
+def handle_connect():
+    """
+    Обработва свързването на нов клиент.
+    При свързване на ПЪРВИЯ клиент, стартира фоновата задача за четене от COM порта.
+    """
+    global com_reader_started
+    logger.info(f"Клиент {request.sid} се свърза.")
+
+    # Синхронизираме достъпа до флага, за да няма проблеми при много бързи връзки
+    with app.app_context():
+        if not com_reader_started:
+            if com_port_scanner and com_port_scanner.is_running:
+                com_port_scanner.start_reading_task()
+                com_reader_started = True
+            else:
+                logger.error("SocketIO client connected, but ComPortManager is not ready.")
+
+    # При свързване, изпращаме нужните данни (преводи) на конкретния клиент
+    handle_request_initial_data()
+
+
+@socketio.on('disconnect')
+def handle_disconnect():
+    logger.info(f"Клиент {request.sid} се разкачи.")
+
+
+@socketio.on('request_initial_data')
+def handle_request_initial_data():
+    """
+    Изпраща само базови данни към клиента при заявка - основно преводи.
+    """
+    lang_code = session.get('language', Config.DEFAULT_LANGUAGE)
+    current_translations = translation_data.get(lang_code, translation_data.get(Config.DEFAULT_LANGUAGE, {}))
+
+    emit('initial_data', {
+        'translations': current_translations,
+        'current_lang': lang_code,
+        'supported_languages': Config.SUPPORTED_LANGUAGES
+    })
+    logger.debug(f"Изпратени са начални данни (преводи) на клиент {request.sid}")
+
+
+# --- НОВИ ХЕНДЛЪРИ ЗА НОВАТА АРХИТЕКТУРА ---
+
+@socketio.on('validate_operator')
+def handle_validate_operator(data):
+    """
+    Получава баркод от JS, валидира го през API и връща резултат.
+    Това е "мозъкът" на сървърната част за тази операция.
+    """
+    badge_id = data.get('barcode')
+    if not badge_id:
+        return
+
+    logger.info(f"Получена заявка за валидация на оператор с бадж: {badge_id}")
+    add_log_message("log.validatingOperator", "info", badge_id=badge_id)
+
+    response = traceability_api_client.validate_operator_badge(reader_id=badge_id)
+
+    is_valid = False
+    operator_info = None
+
+    if response and "VALUES" in response and isinstance(response.get("VALUES"), dict):
+        api_data = response["VALUES"]
+        if str(api_data.get("P_EXID")) == "0":
+            is_valid = True
+            operator_info = {
+                "id": badge_id,
+                "name": api_data.get("P_NAME", "N/A"),
+                "employee_no": api_data.get("P_EMNO", badge_id)
+            }
+            # Запазваме логнатия оператор в глобалното състояние на сървъра
+            global_line_status_data['current_operator'] = operator_info
+            add_log_message("log.operatorLoggedIn", "success", operator_name=operator_info['name'])
+        else:
+            error_message = api_data.get("P_EXMES", "Unknown validation error")
+            add_log_message("log.operatorApiValidationFailed", "warning", error=error_message)
+    else:
+        add_log_message("log.operatorApiError", "error", badge_id=badge_id)
+
+    # Изпращаме резултата ОБРАТНО към клиента, който го поиска
+    emit('operator_validation_result', {'is_valid': is_valid, 'operator_info': operator_info})
+
+
+@socketio.on('language_changed')
+def handle_language_changed(data):
+    # Тази функция остава същата
+    lang_code = data.get('lang')
+    if lang_code in Config.SUPPORTED_LANGUAGES:
+        session['language'] = lang_code
+        logger.info(f"Клиент {request.sid} смени езика на {lang_code}")
+        # Изпращаме му новите преводи
+        handle_request_initial_data()
+
+
+# ДОБАВЕТЕ ТОЗИ КОД ВЪВ ФАЙЛА backend/app.py
+
+@socketio.on('logout_request')
+def handle_logout_request():
+    """
+    Обработва заявка за изход от системата от страна на клиента.
+    """
+    logger.info(f"Клиент {request.sid} поиска изход от системата.")
+
+    # Нулираме оператора в глобалното състояние
+    logged_out_operator = global_line_status_data.get('current_operator')
+    global_line_status_data['current_operator'] = None
+
+    if logged_out_operator:
+        add_log_message("log.operatorLoggedOut", "info", operator_name=logged_out_operator.get('name', ''))
+
+    # Изпращаме същия тип събитие като при валидация, но с празни данни
+    # за да може UI да се върне в начално състояние.
+    emit('operator_validation_result', {'is_valid': False, 'operator_info': None})
+
+
+# ДОБАВЕТЕ ТОЗИ КОД ВЪВ ФАЙЛА backend/app.py
+
+# Намерете тази функция в backend/app.py и я заменете с този код
+
+@socketio.on('validate_travel_lot')
+def handle_validate_travel_lot(data):
+    """
+    Получава баркод на маршрутна карта, валидира го и регистрира нова поръчка.
+    (ВЕРСИЯ С ПОДОБРЕНО ЛОГВАНЕ И ПРОВЕРКИ)
+    """
+    travel_lot_barcode = data.get('barcode')
+    if not travel_lot_barcode:
+        return
+
+    current_operator = global_line_status_data.get('current_operator')
+    if not current_operator:
+        add_log_message("log.operatorLoginRequired", "error")
+        emit('travel_lot_validation_result', {'is_valid': False, 'error': 'No operator logged in'})
+        return
+
+    workplace_id = Config.TRACEABILITY_WORKPLACE_ID
+    employee_id = current_operator.get('employee_no')
+
+    logger.info(f"Получена заявка за валидация на маршрутна карта: {travel_lot_barcode} от оператор ID: {employee_id}")
+
+    # Извикваме API функцията
+    response = traceability_api_client.ftpck_new_order(
+        workplace_id=workplace_id,
+        route_map=travel_lot_barcode,
+        employee_id=employee_id
+    )
+
+    # 1. ПРОВЕРЯВАМЕ ДАЛИ ИЗОБЩО ИМАМЕ ОТГОВОР ОТ API-то
+    if not response:
+        logger.error("API клиентът върна None. Няма връзка или има грешка при заявката.")
+        add_log_message("log.operatorApiError", "error",
+                        badge_id=travel_lot_barcode)  # Може да се наложи нов ключ за превод
+        emit('travel_lot_validation_result', {'is_valid': False, 'travel_lot_info': None})
+        return
+
+    # 2. ЛОГВАМЕ ЦЕЛИЯ ОТГОВОР, ЗА ДА ГО ВИДИМ
+    logger.debug(f"Пълен отговор от API за ftpck_new_order: {response}")
+
+    is_valid = False
+    travel_lot_info = None
+
+    # ВАЖНО: Вече е възможно отговорът да няма ключ "VALUES", затова го достъпваме безопасно
+    api_values = response.get("VALUES", {})
+    if not isinstance(api_values, dict):  # Уверяваме се, че VALUES е речник
+        api_values = {}
+
+    # 3. ИЗВЛИЧАМЕ P_EXID ПО-БЕЗОПАСНО
+    p_exid_value = api_values.get("P_EXID")
+
+    # 4. ЛОГВАМЕ ТИПА И СТОЙНОСТТА НА P_EXID
+    logger.debug(f"Стойност на P_EXID: '{p_exid_value}', Тип на P_EXID: {type(p_exid_value)}")
+
+    # 5. ПРАВИМ ПО-УСТОЙЧИВО СРАВНЕНИЕ
+    # Това ще работи правилно, независимо дали p_exid_value е числото 0, низът "0", или дори None.
+    if p_exid_value is not None and str(p_exid_value) == "0":
+        logger.info("Условието за успех (P_EXID == 0) е изпълнено.")
+        is_valid = True
+        travel_lot_info = {
+            "id": travel_lot_barcode,
+            "productNumber": api_values.get("P_MITM", "N/A"),
+            "description": "Описание от API"  # Може да се наложи да се вземе от друго поле
+        }
+        global_line_status_data['current_travel_lot'] = travel_lot_info
+        add_log_message("log.travelLotIdentified", "success", lot_id=travel_lot_barcode,
+                        item_number=travel_lot_info['productNumber'])
+    else:
+        logger.warning(f"Условието за успех (P_EXID == 0) НЕ е изпълнено. P_EXID = '{p_exid_value}'")
+        error_message = response.get("P_EXMES", "Unknown error from API")
+        add_log_message("log.travelLotApiError", "error", error=error_message)
+
+    emit('travel_lot_validation_result', {'is_valid': is_valid, 'travel_lot_info': travel_lot_info})
+
+--- END FILE: .\backend\app.py ---
+
+--- START FILE: .\backend\config.py ---
+
+import os
+
+class Config:
+    SECRET_KEY = os.environ.get('SECRET_KEY') or 'your_very_secret_key_123!' # Променете това!
+    DEBUG = True  # Set to False in production
+    PORT = 5000
+    HOST = '0.0.0.0' # Позволява достъп от други машини в мрежата
+    APP_NAME = "ASMg"
+
+    # Barcode Scanner Configuration
+    BARCODE_SCANNER_PORT = 'COM6'
+    BARCODE_SCANNER_BAUDRATE = 9600
+
+    # OPC UA Server Configuration (примерни стойности)
+    OPCUA_SERVER_URL = "opc.tcp://localhost:4840/freeopcua/server/"
+    OPCUA_NAMESPACE = "http://example.com/RaspberryPi" # Променете според вашия namespace
+
+    # Supported Languages: code: "Display Name"
+    SUPPORTED_LANGUAGES = {
+        'en': 'English',
+        'bg': 'Български',
+        'sr': 'Srpski'
+    }
+    DEFAULT_LANGUAGE = 'bg' # Език по подразбиране
+
+    # Конфигурация за Traceability API
+    # Стойности, взети от предоставения traceability_api.py
+    TRACEABILITY_API_URL = os.environ.get('TRACEABILITY_API_URL', "http://oracleapi:3000") #
+    TRACEABILITY_API_KEY = os.environ.get('TRACEABILITY_API_KEY', "2512A449C4B001DBE0639F2B230AF06F") #
+    #TRACEABILITY_WORKPLACE_ID = os.environ.get('TRACEABILITY_WORKPLACE_ID', "1443") #
+    TRACEABILITY_WORKPLACE_ID = os.environ.get('TRACEABILITY_WORKPLACE_ID', "2400")  #
+
+    # Забележка: В тестовете на traceability_api.py се използва и "2400" като P_RDNO. Уточнете кой е правилният за основната конфигурация.
+
+--- END FILE: .\backend\config.py ---
+
+--- START FILE: .\backend\api\__init__.py ---
+
+# Файл: backend/api/__init__.py
+from flask import jsonify
+# Коригирани относителни импорти
+from .operator_routes import register_operator_routes
+from .travel_lot import register_travel_lot_routes
+
+
+# from .machine_status import register_machine_status_routes
+
+# 1. ПРЕМАХВАМЕ 'update_operator_callback' от дефиницията на функцията
+def register_api_routes(app, socketio, line_status_data, translations_data):
+    """
+    Регистрира всички API маршрути към Flask приложението.
+    """
+
+    # Регистриране на маршрут за преводи
+    @app.route('/api/translations/<lang_code>')
+    def get_translations_api(lang_code):
+        from backend.config import Config
+        if lang_code in translations_data:
+            return jsonify(translations_data[lang_code])
+        elif Config.DEFAULT_LANGUAGE in translations_data:
+            return jsonify(translations_data[Config.DEFAULT_LANGUAGE])
+        return jsonify({"error": f"Language '{lang_code}' not found."}), 404
+
+    # Извикване на функциите за регистрация на маршрути от другите модули
+
+    # 2. ПРЕМАХВАМЕ 'update_operator_callback' и от извикването на тази функция
+    register_operator_routes(app, socketio, translations_data)
+
+    register_travel_lot_routes(app, socketio, translations_data, line_status_data)
+    # register_machine_status_routes(app, socketio, line_status_data, translations_data)
+
+--- END FILE: .\backend\api\__init__.py ---
+
+--- START FILE: .\backend\api\machine_status.py ---
+
+# backend/api/machine_status.py
+
+def register_machine_status_routes(app, socketio, line_status_data, translations_data):
+    """
+    Регистрира маршрути, свързани със статуса на машината, ако са необходими API ендпойнтове.
+    В момента повечето актуализации на статуса се извършват чрез SocketIO.
+    """
+    # Пример:
+    # @app.route('/api/machine/command', methods=['POST'])
+    # def machine_command():
+    #     # Логика за изпращане на команди към PLC/машината
+    #     return jsonify({"status": "command_sent"})
+    pass
+
+--- END FILE: .\backend\api\machine_status.py ---
+
+--- START FILE: .\backend\api\operator_routes.py ---
+
+# Файл: backend/api/operator_routes.py
+
+def register_operator_routes(app, socketio, translations):
+    """
+    Тази функция е запазена, за да не се чупят импортите,
+    но в новата архитектура логиката за операторите се управлява
+    директно от SocketIO събития в app.py.
+
+    Можете да добавите специфични REST API маршрути тук в бъдеще, ако са нужни.
+    """
+    # В момента няма нужда от нищо тук.
+    pass
+
+--- END FILE: .\backend\api\operator_routes.py ---
+
+--- START FILE: .\backend\api\travel_lot.py ---
+
+from flask import request, jsonify
+# from backend.app import global_line_status_data, add_log_message # Не импортирайте директно
+
+def register_travel_lot_routes(app, socketio, translations, line_status_data_ref):
+    """
+    Регистрира маршрути, свързани с пътни карти.
+    line_status_data_ref е референция към global_line_status_data от app.py
+    """
+    from backend.app import add_log_message # Късен импорт
+
+    @app.route('/api/travel_lot/scan', methods=['POST'])
+    def api_scan_travel_lot():
+        data = request.get_json()
+        lot_id = data.get('lot_id')
+
+        if not lot_id:
+            return jsonify({"status": "error", "message": "Travel lot ID is required"}), 400
+
+        # Примерна логика за обработка на пътна карта
+        # В реално приложение, тук ще има заявка към база данни или ERP система
+        if lot_id == "TL-001":
+            travel_lot_info = {
+                "id": lot_id,
+                "productNumber": "PROD-XYZ-001",
+                "description": "Модул за контрол на осветление ( от API )",
+                "orderNumber": "ORD-98765",
+                "quantity": 1000
+            }
+        elif lot_id == "TL-002":
+            travel_lot_info = {
+                "id": lot_id,
+                "productNumber": "PROD-ABC-002",
+                "description": "Захранващ блок (от API)",
+                "orderNumber": "ORD-12345",
+                "quantity": 500
+            }
+        else:
+            add_log_message("log.travelLotNotFound", "error", lot_id=lot_id)
+            return jsonify({"status": "error", "message": f"Travel lot {lot_id} not found"}), 404
+
+        line_status_data_ref['current_travel_lot'] = travel_lot_info
+        socketio.emit('travel_lot_update', {'travel_lot': travel_lot_info})
+        add_log_message("log.travelLotIdentified", "info", lot_id=lot_id, item_number=travel_lot_info['productNumber'])
+        return jsonify({"status": "success", "message": "Travel lot processed", "data": travel_lot_info}), 200
+
+    @socketio.on('clear_travel_card_request')
+    def handle_clear_travel_card():
+        from backend.app import add_log_message # Късен импорт
+        line_status_data_ref['current_travel_lot'] = None
+        socketio.emit('travel_lot_update', {'travel_lot': None})
+        add_log_message("log.travelCardCleared", "info")
+
+--- END FILE: .\backend\api\travel_lot.py ---
+
+--- START FILE: .\backend\services\__init__.py ---
+
+# Празен файл, маркиращ директорията като пакет
+
+--- END FILE: .\backend\services\__init__.py ---
+
+--- START FILE: .\backend\services\com_port_manager.py ---
+
+# Файл: backend/services/com_port_manager.py
+import serial
+import time
+import logging
+
+# Премахваме 'import threading', вече не ни е нужен
+
+logger = logging.getLogger("ASMg_App")
+
+class ComPortManager:
+    def __init__(self, port, baudrate, socketio):
+        self.port_name = port
+        self.baudrate = baudrate
+        self.serial_port = None
+        self.is_running = False
+        self.socketio = socketio
+        # Премахваме self.thread
+        logger.info(f"ComPortManager initialized for port {self.port_name} at {self.baudrate} baud.")
+
+    def open_port(self):
+        """
+        Вече само отваря порта физически, без да стартира нишка.
+        """
+        try:
+            logger.debug(f"Attempting to open serial port: {self.port_name}")
+            self.serial_port = serial.Serial(self.port_name, self.baudrate, timeout=1)
+            self.is_running = True # Показваме, че сме готови за четене
+            logger.info(f"Successfully opened serial port {self.port_name}")
+            self.socketio.emit('log_message', {'message': f'COM порт {self.port_name} е успешно отворен.', 'level': 'success'})
+            return True
+        except Exception as e:
+            logger.error(f"Error opening port {self.port_name}: {e}")
+            self.socketio.emit('log_message', {'message': f'Грешка при отваряне на COM порт {self.port_name}: {e}', 'level': 'error'})
+            return False
+
+    def start_reading_task(self):
+        """
+        Нова функция, която стартира четенето като фонова задача на Socket.IO.
+        """
+        if self.is_running:
+            logger.info("Starting the background task for reading from COM port.")
+            self.socketio.start_background_task(target=self._read_from_port)
+        else:
+            logger.warning("Attempted to start reading task, but port is not running.")
+
+    def _read_from_port(self):
+        """
+        Тази функция остава същата, но вече ще се изпълнява като задача на Socket.IO.
+        """
+        logger.info(f"Background task started: Now reading from {self.port_name}...")
+        buffer = ""
+        while self.is_running:
+            if not self.serial_port or not self.serial_port.is_open:
+                logger.warning(f"Serial port {self.port_name} is not open. Stopping reader task.")
+                self.is_running = False
+                break
+            try:
+                if self.serial_port.in_waiting > 0:
+                    data_chunk = self.serial_port.read(self.serial_port.in_waiting).decode('utf-8', errors='ignore')
+                    buffer += data_chunk
+                    while '\n' in buffer or '\r' in buffer:
+                        end_pos = buffer.find('\n') if '\n' in buffer else buffer.find('\r')
+                        line_to_process = buffer[:end_pos].strip()
+                        buffer = buffer[end_pos+1:]
+                        if line_to_process:
+                            self._process_barcode_data(line_to_process)
+                # self.socketio.sleep() е много важно за фоновите задачи на Socket.IO
+                self.socketio.sleep(0.05)
+            except Exception as e:
+                logger.error(f"Unexpected error in _read_from_port: {e}", exc_info=True)
+                self.socketio.sleep(1)
+
+    def _process_barcode_data(self, data):
+        """Тази функция остава същата."""
+        logger.info(f"Barcode scanned: '{data}'. Emitting 'barcode_scanned' to frontend.")
+        self.socketio.emit('barcode_scanned', {'barcode': data})
+
+    def close_port(self):
+        """Тази функция остава същата."""
+        self.is_running = False
+        if self.serial_port and self.serial_port.is_open:
+            self.serial_port.close()
+            logger.info(f"Serial port {self.port_name} closed.")
+        self.serial_port = None
+
+--- END FILE: .\backend\services\com_port_manager.py ---
+
+--- START FILE: .\backend\services\data_simulator.py ---
+
+import threading
+import time
+import random
+import logging  # Добавяме logging
+
+logger = logging.getLogger(__name__)  # Използваме логера от app.py
+
+
+class DataSimulatorThread(threading.Thread):
+    def __init__(self, socketio, line_status_data, add_log_message_func):  # Премахнат translations
+        super().__init__(daemon=True)
+        self.socketio = socketio
+        self.line_status_data = line_status_data
+        self.add_log_message = add_log_message_func
+        self.running = True
+        self._module_counter = 1
+        self._turntable1_pos = 0
+        self._turntable2_pos = 0
+        self.add_log_message("log.simulatorInitialized", "debug")
+
+    def run(self):
+        self.add_log_message("log.simulatorStarted", "info")
+        logger.info("Data simulator thread actually started.")  # Директно логване
+
+        while self.running:
+            time.sleep(5)
+            if not self.running:
+                break
+
+            try:
+                # Симулация на общ статус на линията
+                overall_statuses = ["status.running", "status.running", "status.running", "status.warning",
+                                    "status.maintenance"]
+                self.line_status_data["overall_status"] = random.choice(overall_statuses)
+
+                # Симулация на статус на роботи
+                robot_statuses = ["status.working", "status.idle", "status.error"]
+                for i in range(1, 4):
+                    self.line_status_data["robots"][str(i)]["status"] = random.choice(robot_statuses)
+
+                # Симулация на въртележка 1 (единични модули)
+                self._turntable1_pos = (self._turntable1_pos % 4) + 1
+                for i in range(1, 5):
+                    pos_str = str(i)
+                    if i == self._turntable1_pos:
+                        self.line_status_data["turntable1"][pos_str]["status"] = "status.working"
+                        self.line_status_data["turntable1"][pos_str]["moduleId"] = f"MOD-A{self._module_counter:03d}"
+                        self.line_status_data["turntable1"][pos_str]["time"] = random.randint(1, 5)
+                        if i == 4: self._module_counter += 1
+                    elif i == (self._turntable1_pos - 1) or (self._turntable1_pos == 1 and i == 4):
+                        self.line_status_data["turntable1"][pos_str]["status"] = "status.ok"
+                        self.line_status_data["turntable1"][pos_str]["time"] = 5
+                    else:
+                        self.line_status_data["turntable1"][pos_str]["status"] = "status.idle"
+                        self.line_status_data["turntable1"][pos_str]["moduleId"] = "--"
+                        self.line_status_data["turntable1"][pos_str]["time"] = 0
+
+                # Симулация на въртележка 2 (групи от модули)
+                self._turntable2_pos = (self._turntable2_pos % 4) + 1
+                for i in range(1, 5):
+                    pos_str = str(i)
+                    if i == self._turntable2_pos:
+                        self.line_status_data["turntable2"][pos_str]["status"] = "status.working"
+                        self.line_status_data["turntable2"][pos_str]["moduleIds"] = [
+                            f"MOD-B{self._module_counter + j:03d}" for j in range(4)
+                        ]
+                        self.line_status_data["turntable2"][pos_str]["time"] = random.randint(10, 20)
+                        self.line_status_data["turntable2"][pos_str]["progress"] = random.randint(10, 90)
+                        if i == 4: self._module_counter += 4
+                    elif i == (self._turntable2_pos - 1) or (self._turntable2_pos == 1 and i == 4):
+                        self.line_status_data["turntable2"][pos_str]["status"] = "status.ok"
+                        self.line_status_data["turntable2"][pos_str]["time"] = 20
+                        self.line_status_data["turntable2"][pos_str]["progress"] = 100
+                    else:
+                        self.line_status_data["turntable2"][pos_str]["status"] = "status.idle"
+                        self.line_status_data["turntable2"][pos_str]["moduleIds"] = []
+                        self.line_status_data["turntable2"][pos_str]["time"] = 0
+                        self.line_status_data["turntable2"][pos_str]["progress"] = 0
+
+                # Симулация на статус на тави
+                tray_statuses = ["status.okFull", "status.almostFull", "status.empty", "status.waitingForLoad",
+                                 "status.waitingForUnload"]
+                self.line_status_data["trays"]["in"]["status"] = random.choice(tray_statuses)
+                self.line_status_data["trays"]["out"]["status"] = random.choice(tray_statuses)
+
+                self.socketio.emit('update_status', self.line_status_data)
+                # logger.debug(f"Simulated data update: {self.line_status_data}")
+            except Exception as e:
+                logger.error(f"Error in data simulator loop: {e}", exc_info=True)
+                # Може да добавите self.add_log_message тук, но внимавайте да не предизвикате рекурсия или претоварване на логовете
+        logger.info("Data simulator thread loop finished.")
+
+    def stop(self):
+        self.running = False
+        self.add_log_message("log.simulatorStopping", "info")
+        logger.info("Data simulator thread stopping command received.")
+
+--- END FILE: .\backend\services\data_simulator.py ---
+
+--- START FILE: .\backend\services\opc_ua_client.py ---
+
+# backend/services/opc_ua_client.py
+
+# Placeholder за OPC UA клиент
+# Трябва да инсталирате asyncua или подобна библиотека: pip install asyncua
+
+# from asyncua import Client, ua
+
+class OpcUaManager:
+    def __init__(self, url, namespace, socketio, line_status_data, translations):
+        self.url = url
+        self.namespace_idx = None  # Ще се определи след свързване
+        self.namespace_uri = namespace
+        self.client = None
+        self.socketio = socketio
+        self.line_status_data = line_status_data
+        self.translations = translations
+        self.running = False
+        self.subscription = None
+        self.handler = None
+        # Импортираме add_log_message тук
+        from backend.app import add_log_message
+        self.add_log_message = add_log_message
+
+    async def connect(self):
+        """Свързва се с OPC UA сървъра."""
+        try:
+            self.client = Client(url=self.url)
+            await self.client.connect()
+            self.namespace_idx = await self.client.get_namespace_index(self.namespace_uri)
+            self.add_log_message("opcua.connected", "success", url=self.url)
+            print(f"Connected to OPC UA server at {self.url}")
+            self.running = True
+            # Тук можете да стартирате абонамент за промени
+            # await self.subscribe_to_variables()
+        except Exception as e:
+            self.add_log_message("opcua.connectError", "error", url=self.url, error=str(e))
+            print(f"Error connecting to OPC UA server: {e}")
+            self.client = None
+
+    async def disconnect(self):
+        """Прекъсва връзката с OPC UA сървъра."""
+        if self.client and self.client.uaclient:
+            try:
+                if self.subscription:
+                    await self.subscription.delete()
+                    self.add_log_message("opcua.subscriptionDeleted", "info")
+                await self.client.disconnect()
+                self.add_log_message("opcua.disconnected", "info")
+                print("Disconnected from OPC UA server.")
+            except Exception as e:
+                self.add_log_message("opcua.disconnectError", "error", error=str(e))
+                print(f"Error disconnecting from OPC UA server: {e}")
+        self.running = False
+        self.client = None
+
+    async def read_value(self, node_id_str):
+        """Чете стойност от OPC UA нод."""
+        if not self.client or not self.running:
+            self.add_log_message("opcua.notConnectedRead", "warning", node_id=node_id_str)
+            return None
+        try:
+            node = self.client.get_node(f"ns={self.namespace_idx};s={node_id_str}")
+            value = await node.get_value()
+            self.add_log_message("opcua.readValueSuccess", "debug", node_id=node_id_str, value=value)
+            return value
+        except Exception as e:
+            self.add_log_message("opcua.readValueFail", "error", node_id=node_id_str, error=str(e))
+            print(f"Error reading OPC UA node {node_id_str}: {e}")
+            return None
+
+    async def write_value(self, node_id_str, value, ua_type):
+        """Записва стойност в OPC UA нод."""
+        if not self.client or not self.running:
+            self.add_log_message("opcua.notConnectedWrite", "warning", node_id=node_id_str)
+            return False
+        try:
+            node = self.client.get_node(f"ns={self.namespace_idx};s={node_id_str}")
+            ua_value = ua.DataValue(ua.Variant(value, ua_type))
+            await node.set_value(ua_value)
+            self.add_log_message("opcua.writeValueSuccess", "debug", node_id=node_id_str, value=value)
+            return True
+        except Exception as e:
+            self.add_log_message("opcua.writeValueFail", "error", node_id=node_id_str, error=str(e))
+            print(f"Error writing OPC UA node {node_id_str}: {e}")
+            return False
+
+    # Пример за абонамент (ще трябва да се адаптира според вашите нужди)
+    # async def subscribe_to_variables(self):
+    #     class SubHandler:
+    #         def __init__(self, socketio, line_status_data, translations, add_log_message_func):
+    #             self.socketio = socketio
+    #             self.line_status_data = line_status_data
+    #             self.translations = translations
+    #             self.add_log_message = add_log_message_func
+
+    #         def datachange_notification(self, node, val, data):
+    #             node_str = node.nodeid.to_string()
+    #             print(f"OPC UA DataChange: Node={node_str}, Value={val}")
+    #             self.add_log_message("opcua.dataChange", "debug", node=node_str, value=val)
+    #             # Тук трябва да има логика за актуализиране на self.line_status_data
+    #             # и изпращане на socketio.emit('update_status', self.line_status_data)
+    #             # Пример:
+    #             # if "Robot1.Status" in node_str:
+    #             #     self.line_status_data["robots"]["1"]["status"] = "status.working" if val else "status.idle"
+    #             #     self.socketio.emit('update_status', {'robots': {'1': self.line_status_data["robots"]["1"]}})
+
+    #     self.handler = SubHandler(self.socketio, self.line_status_data, self.translations, self.add_log_message)
+    #     self.subscription = await self.client.create_subscription(500, self.handler) # Период 500ms
+
+    #     # Примерни нодове за абонамент (трябва да се заменят с реални)
+    #     nodes_to_subscribe = [
+    #         # f"ns={self.namespace_idx};s=Path.To.Robot1.Status",
+    #         # f"ns={self.namespace_idx};s=Path.To.Turntable1.Position1.ModuleID",
+    #     ]
+    #     handles = []
+    #     for node_str in nodes_to_subscribe:
+    #         try:
+    #             node = self.client.get_node(node_str)
+    #             handle = await self.subscription.subscribe_data_change(node)
+    #             handles.append(handle)
+    #             self.add_log_message("opcua.subscribedToNode", "info", node_id=node_str)
+    #         except Exception as e:
+    #             self.add_log_message("opcua.subscribeError", "error", node_id=node_str, error=str(e))
+    #             print(f"Error subscribing to node {node_str}: {e}")
+    #     if not handles:
+    #         self.add_log_message("opcua.noSubscriptions", "warning")
+
+# За да използвате OpcUaManager, ще трябва да го инстанцирате и да извикате неговите async методи
+# в рамките на asyncio event loop, обикновено в отделна нишка или с помощта на `asyncio.run()`.
+# Например, в app.py:
+# opc_manager = OpcUaManager(Config.OPCUA_SERVER_URL, Config.OPCUA_NAMESPACE, socketio, global_line_status_data, translation_data)
+# def opcua_thread_target():
+#     loop = asyncio.new_event_loop()
+#     asyncio.set_event_loop(loop)
+#     try:
+#         loop.run_until_complete(opc_manager.connect())
+#         if opc_manager.running:
+#             loop.run_forever() # Or some other way to keep it running and processing subscriptions
+#     except KeyboardInterrupt:
+#         pass
+#     finally:
+#         if opc_manager.running:
+#             loop.run_until_complete(opc_manager.disconnect())
+#         loop.close()
+# opcua_thread = threading.Thread(target=opcua_thread_target, daemon=True)
+# opcua_thread.start()
+
+--- END FILE: .\backend\services\opc_ua_client.py ---
+
+--- START FILE: .\backend\services\traceability_api.py ---
+
+import requests
+import json
+import urllib3
+import logging  # Добавяме logging
+
+# Потискане на предупрежденията за InsecureRequestWarning при verify=False
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
+
+class TraceabilityAPI:
+    def __init__(self, base_url, api_key, logger_func=None):  # Добавяме logger_func
+        self.base_url = base_url
+        self.headers = {
+            "IMI-API-KEY": api_key,
+            "Content-Type": "application/json"
+        }
+        self.logger = logger_func if logger_func else logging.getLogger(__name__)
+        self.logger.info(f"TraceabilityAPI initialized with URL: {self.base_url}")
+
+    def _log(self, level, message):
+        """Помощна функция за логване."""
+        if level == "info":
+            self.logger.info(message)
+        elif level == "error":
+            self.logger.error(message)
+        elif level == "warning":
+            self.logger.warning(message)
+        elif level == "debug":
+            self.logger.debug(message)
+        else:
+            self.logger.info(message)
+    '''
+    def send_request(self, procedure, params):
+        """Изпраща заявка към Traceability API."""
+        payload = {
+            "OWNER": "TRANS",
+            "PACKAGE": "AUTOMATION_FTPCK",  # или "SENSITECH", ако е глобално за всички процедури
+            "PROCEDURE": procedure,
+            "PARAMS": params
+        }
+        self._log('debug',
+                  f"Traceability API Request: URL={self.base_url}/executeProcedure, Payload={json.dumps(payload)}")
+
+        try:
+            response = requests.post(f"{self.base_url}/executeProcedure",
+                                     headers=self.headers,
+                                     data=json.dumps(payload),
+                                     verify=False,
+                                     timeout=10)
+            self._log('debug',
+                      f"Traceability API Response: Status={response.status_code}, Body={response.text[:500]}")  # Логваме първите 500 символа от отговора
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as http_err:
+            self._log('error',
+                      f"Traceability API - HTTP error for {procedure}: {http_err} - Response: {response.text if 'response' in locals() else 'N/A'}")
+        except requests.exceptions.ConnectionError as conn_err:
+            self._log('error', f"Traceability API - Connection error for {procedure}: {conn_err}")
+        except requests.exceptions.Timeout as timeout_err:
+            self._log('error', f"Traceability API - Timeout error for {procedure}: {timeout_err}")
+        except requests.exceptions.RequestException as req_err:
+            self._log('error', f"Traceability API - General request error for {procedure}: {req_err}")
+        except json.JSONDecodeError as json_err:
+            self._log('error',
+                      f"Traceability API - Error decoding JSON response for {procedure}: {json_err} - Response was: {response.text if 'response' in locals() else 'N/A'}")
+        return None
+    '''
+    def send_request(self, procedure, params, package=""):
+        """Изпраща заявка към Traceability API."""
+        payload = {
+            "OWNER": "TRANS",
+            "PACKAGE": package,  # Вече е параметър с default стойност ""
+            "PROCEDURE": procedure,
+            "PARAMS": params
+        }
+        self._log('debug',
+                  f"Traceability API Request: URL={self.base_url}/executeProcedure, Payload={json.dumps(payload)}")
+
+        try:
+            response = requests.post(f"{self.base_url}/executeProcedure",
+                                     headers=self.headers,
+                                     data=json.dumps(payload),
+                                     verify=False,
+                                     timeout=10)
+            self._log('debug',
+                      f"Traceability API Response: Status={response.status_code}, Body={response.text[:500]}")
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as http_err:
+            self._log('error',
+                      f"Traceability API - HTTP error for {procedure}: {http_err} - Response: {response.text if 'response' in locals() else 'N/A'}")
+        except requests.exceptions.ConnectionError as conn_err:
+            self._log('error', f"Traceability API - Connection error for {procedure}: {conn_err}")
+        except requests.exceptions.Timeout as timeout_err:
+            self._log('error', f"Traceability API - Timeout error for {procedure}: {timeout_err}")
+        except requests.exceptions.RequestException as req_err:
+            self._log('error', f"Traceability API - General request error for {procedure}: {req_err}")
+        except json.JSONDecodeError as json_err:
+            self._log('error',
+                      f"Traceability API - Error decoding JSON response for {procedure}: {json_err} - Response was: {response.text if 'response' in locals() else 'N/A'}")
+        return None
+
+    # STEP1: Validate Operator Badge
+    def validate_operator_badge(self, reader_id):
+        self._log('info', f"Validating operator badge: {reader_id}")
+        params = {"P_READER": reader_id}
+        return self.send_request("GET_VALID_EMNOEXT", params)
+
+    '''
+    # STEP2: Register operation and operator
+    def ftpck_new_order(self, workplace_id, route_map, employee_id):
+        self._log('info',
+                  f"Registering new order: Workplace={workplace_id}, RouteMap={route_map}, Employee={employee_id}")
+        params = {
+            "P_RDNO": workplace_id,
+            "P_ROUTE_MAP": route_map,
+            "P_EMNO": employee_id
+        }
+        return self.send_request("FTPCK_NEW_ORDER", params)
+    '''
+    # STEP2: Register operation and operator
+    def ftpck_new_order(self, workplace_id, route_map, employee_id):
+        self._log('info',
+                  f"Registering new order: Workplace={workplace_id}, RouteMap={route_map}, Employee={employee_id}")
+        params = {
+            "P_RDNO": workplace_id,
+            "P_ROUTE_MAP": route_map,
+            "P_EMNO": employee_id
+        }
+        # Променете извикването на send_request, за да подадете PACKAGE
+        return self.send_request("FTPCK_NEW_ORDER", params, package="AUTOMATION_FTPCK")
+
+    # STEP3: Register  Package
+    def pck_new_pack(self, workplace_id, pack_barcode):
+        self._log('info', f"Registering new pack: Workplace={workplace_id}, PackBarcode={pack_barcode}")
+        params = {
+            "P_RDNO": workplace_id,
+            "P_PCKB": pack_barcode
+        }
+        return self.send_request("PCK_NEW_PACK", params)
+
+    # STEP4: Extracting Module ID from Barcode
+    def get_mdno_from_string_ext(self, module_barcode, product_id):
+        self._log('info', f"Extracting module ID: Barcode={module_barcode}, ProductID={product_id}")
+        params = {
+            "P_MDSTR": module_barcode,
+            "P_MITM": product_id
+        }
+        return self.send_request("GETMDNOFROMSTRINGEXT", params)
+
+    # STEP5: Validate Module
+    def ftpck_module_in(self, workplace_id, module_id):
+        self._log('info', f"Validating module IN: Workplace={workplace_id}, ModuleID={module_id}")
+        params = {
+            "P_RDNO": workplace_id,
+            "P_MDNO": module_id,
+            "P_RTFL": "0"
+        }
+        return self.send_request("FTPCK_MODULE_IN", params)
+
+    # STEP6: Save Test Result
+    def ftpck_module_out(self, workplace_id, employee_id, module_id, test_status="1", test_data="TEST DATA",
+                         fail_info=""):
+        self._log('info',
+                  f"Saving module OUT (test result): Workplace={workplace_id}, Employee={employee_id}, ModuleID={module_id}, Status={test_status}")
+        params = {
+            "P_RDNO": workplace_id,
+            "P_EMNO": employee_id,
+            "P_MDNO": module_id,
+            "P_RTFL": "0",
+            "P_TSFL": str(test_status),
+            "P_DATA": test_data,
+            "P_ERRI": fail_info if str(test_status) == "0" else ""
+        }
+        return self.send_request("FTPCK_MODULE_OUT", params)
+
+    # STEP7: Generate CAB Label
+    def get_cab_label(self, workplace_id, module_id, product_id):
+        self._log('info', f"Getting CAB label: Workplace={workplace_id}, ModuleID={module_id}, ProductID={product_id}")
+        params = {
+            "P_RDNO": workplace_id,
+            "P_MDNO": module_id,
+            "P_MITM": product_id
+        }
+        return self.send_request("GET_CAB_LABEL", params)
+
+    # STEP8: Register Module to Package
+    def pck_module_in(self, workplace_id, package_id, item_id, module_id, label_content, employee_id):
+        self._log('info',
+                  f"Registering module to package: Workplace={workplace_id}, PackageID={package_id}, ModuleID={module_id}")
+        params = {
+            "P_RDNO": workplace_id,
+            "P_PCID": package_id,
+            "P_ITEM": item_id,
+            "P_MDNO": module_id,
+            "P_CVAL": label_content,
+            "P_EMNO": employee_id
+        }
+        return self.send_request("PCK_MODULE_IN", params)
+
+
+if __name__ == "__main__":
+    # Конфигурация на логера за самостоятелно тестване
+    test_logger = logging.getLogger("TraceabilityAPITest")
+    test_logger.setLevel(logging.DEBUG)
+    test_handler = logging.StreamHandler()
+    test_formatter = logging.Formatter('%(asctime)s - %(name)s - %(levelname)s - %(message)s')
+    test_handler.setFormatter(test_formatter)
+    test_logger.addHandler(test_handler)
+    test_logger.info("--- Самостоятелно тестване на TraceabilityAPI ---")
+
+    BASE_URL_TEST = "http://oracleapi:3000"
+    API_KEY_TEST = "2512A449C4B001DBE0639F2B230AF06F"
+
+    api_client = TraceabilityAPI(BASE_URL_TEST, API_KEY_TEST, logger_func=test_logger)
+
+    test_logger.info("🔄 Стартиране на тестове за Traceability API...\n")
+    WORKPLACE_ID = "2400"
+
+    test_logger.info("--- Тест за валидация на оператор ---")
+    test_badge = "2HC7912"
+    response = api_client.validate_operator_badge(test_badge)
+    if response and response.get("OUT_DATA") and isinstance(response["OUT_DATA"], list) and len(
+            response["OUT_DATA"]) > 0:
+        operator_data = response["OUT_DATA"][0]
+        if operator_data.get("P_EXID") == "0":
+            test_logger.info(
+                f"✅ Валиден оператор: {test_badge} -> Име: {operator_data.get('P_NAME')}, ID: {operator_data.get('P_EMNO')}")
+        elif operator_data.get("P_EXID") == "1":
+            test_logger.warning(f"❌ Невалиден оператор (P_EXID=1): {test_badge} - {operator_data.get('P_ERR_MSG')}")
+        else:
+            test_logger.warning(f"❓ Неизвестен отговор за оператор: {test_badge} -> {operator_data}")
+    elif response and response.get("ERROR_STACK"):
+        test_logger.error(f"❌ Грешка от API при валидация на оператор {test_badge}: {response.get('ERROR_STACK')}")
+    else:
+        test_logger.error(f"❌ Няма отговор или неочакван формат за оператор: {test_badge}")
+    test_logger.info("-" * 20)
+
+    # Можете да добавите още тестове тук по същия начин
+    # ... (останалите тестове от вашия файл, ако желаете) ...
+
+    test_logger.info("✅ Всички тестове завършени!")
+
+
+
+
+--- END FILE: .\backend\services\traceability_api.py ---
+
+--- START FILE: .\backend\translations\__init__.py ---
+
+# Този файл може да остане празен.
+# Той указва, че директорията 'translations' е Python пакет.
+
+--- END FILE: .\backend\translations\__init__.py ---
+
+--- START FILE: .\backend\translations\translation_manager.py ---
+
+import os
+import json
+
+
+def load_translations(translations_dir):
+    """
+    Зарежда всички JSON файлове с преводи от указаната директория.
+    Имената на файловете (без .json) се използват като кодове на езици.
+    """
+    translations = {}
+    if not os.path.isdir(translations_dir):
+        print(f"Warning: Translations directory '{translations_dir}' not found.")
+        return translations
+
+    for filename in os.listdir(translations_dir):
+        if filename.endswith(".json"):
+            lang_code = filename[:-5]  # Премахва '.json'
+            filepath = os.path.join(translations_dir, filename)
+            try:
+                with open(filepath, 'r', encoding='utf-8') as f:
+                    translations[lang_code] = json.load(f)
+            except Exception as e:
+                print(f"Error loading translation file {filename}: {e}")
+    return translations
+
+
+def get_translation(key, lang_code, translations_data, fallback_lang='en'):
+    """
+    Взема превод за даден ключ и език.
+    Ако ключът не е намерен за дадения език, опитва с fallback езика.
+    Ако и там не е намерен, връща самия ключ.
+    """
+    try:
+        # Опит за намиране на вложен ключ
+        keys = key.split('.')
+        value = translations_data.get(lang_code, {})
+        for k in keys:
+            if isinstance(value, dict):
+                value = value.get(k)
+            else:
+                value = None
+                break
+
+        if value is not None:
+            return value
+
+        # Fallback към основния език, ако е различен
+        if lang_code != fallback_lang:
+            value = translations_data.get(fallback_lang, {})
+            for k in keys:
+                if isinstance(value, dict):
+                    value = value.get(k)
+                else:
+                    value = None
+                    break
+            if value is not None:
+                return value
+
+    except KeyError:
+        pass  # Ще се върне ключът по-долу
+
+    # Ако ключът не е намерен никъде
+    # print(f"Warning: Translation key '{key}' not found for language '{lang_code}' or fallback '{fallback_lang}'.")
+    return key  # Връща самия ключ като fallback
+
+--- END FILE: .\backend\translations\translation_manager.py ---
+
+--- START FILE: .\backend\translations\bg.json ---
+
+{
+    "appTitle": "АСМг - Център за Управление",
+    "mainHeader": "Информационно Табло на Линията",
+    "status.running": "Работи",
+    "status.stopped": "Спряна",
+    "status.error": "Грешка",
+    "status.warning": "Предупреждение",
+    "status.idle": "Изчакване",
+    "status.ok": "ОК",
+    "status.working": "В действие",
+    "status.okFull": "ОК (Пълна)",
+    "status.almostFull": "Почти пълна",
+    "status.empty": "Празна",
+    "status.maintenance": "Поддръжка",
+    "status.waitingForLoad": "Чака зареждане",
+    "status.waitingForUnload": "Чака разтоварване",
+    "status.disconnected": "Прекъсната връзка",
+    "task": {
+        "scanOperator": "Сканирай бадж на оператор",
+        "scanTravelLot": "Сканирай маршрутна карта",
+        "waitingForScan": "Моля, използвайте баркод скенера.",
+        "operatorIdentified": "Оператор",
+        "scanTravelLotPrompt": "Моля, сканирайте маршрутна карта.",
+        "ready": "Готовност за работа",
+        "systemReadyPrompt": "Всички данни са въведени. Линията е готова."
+    },
+    "operatorSection": {
+        "title": "Оператор",
+        "idLabel": "ID на бадж:",
+        "nameLabel": "Име:",
+        "nameDefault": "Няма въведен",
+        "endShiftButton": "Край на Смяна / Изход"
+    },
+    "travelCardSection": {
+        "title": "Пътна Карта",
+        "idLabel": "ID на Пътна Карта:",
+        "itemNumberLabel": "Номер на Изделие:",
+        "itemDescriptionLabel": "Описание:",
+        "orderNumberLabel": "Номер на Поръчка:",
+        "quantityLabel": "Количество:",
+        "loadButton": "Зареди",
+        "clearButton": "Изчисти"
+    },
+    "lineStatusSection": {
+        "title": "Статус на Линията"
+    },
+    "robotsSection": {
+        "title": "Роботи",
+        "robot1": "Робот 1:",
+        "robot2": "Робот 2:",
+        "robot3": "Робот 3:"
+    },
+    "turntable1": {
+        "title": "Въртележка 1 (Етикетиране)",
+        "position1": "Позиция 1",
+        "position2": "Позиция 2",
+        "position3": "Позиция 3",
+        "position4": "Позиция 4"
+    },
+    "turntable2": {
+        "title": "Въртележка 2 (Тестване)",
+        "position1": "Позиция 1",
+        "position2": "Позиция 2",
+        "position3": "Позиция 3",
+        "position4": "Позиция 4"
+    },
+    "turntable": {
+        "statusLabel": "Статус:",
+        "moduleIdLabel": "ID на Модул:",
+        "modulesLabel": "Модули:",
+        "timeLabel": "Време:"
+    },
+    "traysSection": {
+        "title": "Тави",
+        "inTray": "Входяща:",
+        "outTray": "Изходяща:"
+    },
+    "logSection": {
+        "title": "Системни Съобщения"
+    },
+    "socket.connected": "Успешно свързване със сървъра.",
+    "log.comPortOpened": "COM порт {port} е отворен успешно.",
+    "log.comPortOpenError": "Грешка при отваряне на COM порт {port}: {error}",
+    "log.comPortClosed": "COM порт {port} е затворен.",
+    "log.barcodeReceived": "Получен баркод: {barcodeData}",
+    "log.operatorLoggedIn": "Оператор {operator_name} влезе в системата.",
+    "log.operatorLoggedOut": "Оператор излезе от системата.",
+    "log.validatingOperator": "Валидиране на операторски бадж: {badge_id}",
+    "log.operatorApiValidationFailed": "API валидацията на оператор неуспешна: {error}",
+    "log.operatorApiError": "Грешка при комуникация с API за операторски бадж {badge_id}",
+    "log.travelLotIdentified": "Пътна карта идентифицирана: {lot_id}, Изделие: {item_number}",
+    "log.travelCardCleared": "Данните за пътната карта са изчистени.",
+    "log.simulatorInitialized": "Симулаторът на данни е инициализиран.",
+    "log.simulatorStarted": "Симулаторът на данни е стартиран.",
+    "log.simulatorStopping": "Симулаторът на данни спира."
+}
+
+--- END FILE: .\backend\translations\bg.json ---
+
+--- START FILE: .\backend\translations\en.json ---
+
+{
+    "appTitle": "ASMg - Production Line Control Center",
+    "mainHeader": "ASMg - Module Control Center",
+    "status.running": "Running",
+    "status.stopped": "Stopped",
+    "status.error": "Error",
+    "status.warning": "Warning",
+    "status.idle": "Idle",
+    "status.ok": "OK",
+    "status.working": "Working",
+    "status.okFull": "OK (Full)",
+    "status.almostFull": "Almost Full",
+    "status.empty": "Empty",
+    "status.maintenance": "Maintenance",
+    "status.waitingForLoad": "Waiting for Load",
+    "status.waitingForUnload": "Waiting for Unload",
+    "status.disconnected": "Disconnected",
+    "operatorSection.title": "Operator",
+    "operatorSection.idLabel": "Operator ID:",
+    "operatorSection.idPlaceholder": "Scan badge...",
+    "operatorSection.nameLabel": "Operator Name:",
+    "operatorSection.nameDefault": "Not logged in",
+    "operatorSection.startShiftButton": "Start Shift",
+    "operatorSection.endShiftButton": "End Shift",
+    "travelCardSection.title": "Travel Card / Order",
+    "travelCardSection.idLabel": "Travel Card ID:",
+    "travelCardSection.idPlaceholder": "Scan barcode...",
+    "travelCardSection.itemNumberLabel": "Item Number:",
+    "travelCardSection.itemDescriptionLabel": "Item Description:",
+    "travelCardSection.orderNumberLabel": "Order Number:",
+    "travelCardSection.quantityLabel": "Production Quantity:",
+    "travelCardSection.loadButton": "Load Travel Card",
+    "travelCardSection.clearButton": "Clear",
+    "lineStatusSection.title": "Production Line Status",
+    "robotsSection.title": "Robots",
+    "robotsSection.robot1": "Robot 1:",
+    "robotsSection.robot2": "Robot 2:",
+    "robotsSection.robot3": "Robot 3:",
+    "turntable1.title": "Turntable 1 (Barcode & Labeling)",
+    "turntable1.position1": "Position 1: Scan",
+    "turntable1.position2": "Position 2: Labeling",
+    "turntable1.position3": "Position 3: Label Check",
+    "turntable1.position4": "Position 4: Transfer",
+    "turntable2.title": "Turntable 2 (Programming, Test, Sleep)",
+    "turntable2.position1": "Position 1: Loading",
+    "turntable2.position2": "Position 2: Programming",
+    "turntable2.position3": "Position 3: Functional Test",
+    "turntable2.position4": "Position 4: Sleep Mode",
+    "turntable.statusLabel": "Status:",
+    "turntable.moduleIdLabel": "Module ID:",
+    "turntable.modulesLabel": "Modules:",
+    "turntable.timeLabel": "Time:",
+    "traysSection.title": "Trays",
+    "traysSection.inTray": "Inbound Tray:",
+    "traysSection.outTray": "Outbound Tray:",
+    "logSection.title": "Messages & Log",
+    "login.prompt": "Please Scan Your Operator Badge to Begin",
+    "login.waiting": "Waiting for scanner input...",
+    "socket.connected": "Successfully connected to the server.",
+    "socket.disconnected": "Disconnected from server",
+    "socket.connectError": "Connection error to server",
+    "log.lineStarted": "Line started successfully.",
+    "log.moduleScanned": "Module {module_id} scanned successfully at Position {position}.",
+    "log.labelsApplied": "Labels applied for {module_id} at Position {position}.",
+    "log.labelCheckFailed": "Error: Label check failed for {module_id} at Position {position}. Module will be rejected.",
+    "log.lowLabelsWarning": "Warning: Low label stock for printer.",
+    "log.modulesLoadedTurntable2": "Modules {modules} loaded onto Turntable 2, Position {position}.",
+    "log.programmingStarted": "Programming started for {module_id}.",
+    "log.comPortOpened": "COM port {port} opened successfully.",
+    "log.comPortOpenError": "Error opening COM port {port}: {error}",
+    "log.comPortClosed": "COM port {port} closed.",
+    "log.barcodeReceived": "Barcode received: {barcodeData}",
+    "log.operatorIdentified": "Operator identified: {operator_name} ({operator_id})",
+    "log.operatorScanFailed": "Operator badge scan failed. ID: {operator_id}",
+    "log.travelLotIdentified": "Travel card identified: {lot_id}, Item: {item_number}",
+    "log.unknownBarcode": "Unknown barcode: {barcodeData}",
+    "log.operatorLoggedIn": "Operator {operator_name} (ID: {operator_id}) logged in.",
+    "log.operatorLoggedOut": "Operator logged out.",
+    "log.operatorLoginRequired": "Operator login required to proceed.",
+    "log.scanOperatorToStartShift": "Please scan operator badge first to start shift.",
+    "log.shiftStarted": "Shift started for operator",
+    "log.shiftEnded": "Shift ended for operator",
+    "log.noActiveShiftToEnd": "No active shift to end. Please log in first.",
+    "log.scanTravelCardPrompt": "Please scan a travel card.",
+    "log.travelCardCleared": "Travel card data cleared.",
+    "log.comManagerInit": "COM Port Manager initialized for port {port} at {baudrate} baud.",
+    "log.comPortOpening": "Attempting to open COM port {port}...",
+    "log.comPortOpenErrorGeneric": "Generic error opening COM port {port}: {error}",
+    "log.comReaderStarted": "COM port reader started for {port}.",
+    "log.rawDataReceived": "Raw data from COM port: {data}",
+    "log.comReaderStopped": "COM port reader stopped for {port}.",
+    "log.validatingOperator": "Validating operator badge ID: {badge_id} via API.",
+    "log.operatorApiValidationFailed": "Operator API validation failed for badge {badge_id}: {error}",
+    "log.operatorApiNoData": "No valid data (VALUES or ERROR_STACK) in API response for operator badge {badge_id}",
+    "log.operatorApiError": "No response or communication error with API for operator badge {badge_id}",
+    "log.operatorApiErrorDetailed": "API Error for operator badge {badge_id}: {error_details}",
+    "log.processingTravelCard": "Operator logged in. Processing barcode as potential travel card: {barcodeData}",
+    "log.unknownBarcodeAfterLogin": "Unknown barcode scanned after login: {barcodeData}",
+    "log.comPortClosing": "Attempting to close COM port {port}...",
+    "log.comManagerStopped": "COM Port Manager stopped for port {port}.",
+    "log.comDataSent": "Data sent to COM port {port}: {data}",
+    "log.comPortNotOpenWrite": "COM port {port} is not open. Cannot send data.",
+    "log.comPortNotOpenOrClosed": "Serial port {port} is not open or has been closed. Stopping reader thread.",
+    "log.comPortCloseError": "Error closing COM port {port}: {error}",
+    "log.appImportError": "Critical error: Could not import global_line_status_data from backend.app",
+    "log.barcodeDecodeError": "Barcode decode error. Raw data (hex): {data_hex}",
+    "log.simulatorInitialized": "Data simulator initialized.",
+    "log.simulatorStarted": "Data simulator thread started.",
+    "log.simulatorStopping": "Data simulator thread stopping."
+}
+
+--- END FILE: .\backend\translations\en.json ---
+
+--- START FILE: .\backend\translations\sr.json ---
+
+{
+    "appTitle": "ASMg - Production Line Control Center",
+    "mainHeader": "ASMg - Module Control Center",
+    "status.running": "Running",
+    "status.stopped": "Stopped",
+    "status.error": "Error",
+    "status.warning": "Warning",
+    "status.idle": "Idle",
+    "status.ok": "OK",
+    "status.working": "Working",
+    "status.okFull": "OK (Full)",
+    "status.almostFull": "Almost Full",
+    "status.empty": "Empty",
+    "status.maintenance": "Maintenance",
+    "status.waitingForLoad": "Waiting for Load",
+    "status.waitingForUnload": "Waiting for Unload",
+    "status.disconnected": "Disconnected",
+    "operatorSection.title": "Operator",
+    "operatorSection.idLabel": "Operator ID:",
+    "operatorSection.idPlaceholder": "Scan badge...",
+    "operatorSection.nameLabel": "Operator Name:",
+    "operatorSection.nameDefault": "Not logged in",
+    "operatorSection.startShiftButton": "Start Shift",
+    "operatorSection.endShiftButton": "End Shift",
+    "travelCardSection.title": "Travel Card / Order",
+    "travelCardSection.idLabel": "Travel Card ID:",
+    "travelCardSection.idPlaceholder": "Scan barcode...",
+    "travelCardSection.itemNumberLabel": "Item Number:",
+    "travelCardSection.itemDescriptionLabel": "Item Description:",
+    "travelCardSection.orderNumberLabel": "Order Number:",
+    "travelCardSection.quantityLabel": "Production Quantity:",
+    "travelCardSection.loadButton": "Load Travel Card",
+    "travelCardSection.clearButton": "Clear",
+    "lineStatusSection.title": "Production Line Status",
+    "robotsSection.title": "Robots",
+    "robotsSection.robot1": "Robot 1:",
+    "robotsSection.robot2": "Robot 2:",
+    "robotsSection.robot3": "Robot 3:",
+    "turntable1.title": "Turntable 1 (Barcode & Labeling)",
+    "turntable1.position1": "Position 1: Scan",
+    "turntable1.position2": "Position 2: Labeling",
+    "turntable1.position3": "Position 3: Label Check",
+    "turntable1.position4": "Position 4: Transfer",
+    "turntable2.title": "Turntable 2 (Programming, Test, Sleep)",
+    "turntable2.position1": "Position 1: Loading",
+    "turntable2.position2": "Position 2: Programming",
+    "turntable2.position3": "Position 3: Functional Test",
+    "turntable2.position4": "Position 4: Sleep Mode",
+    "turntable.statusLabel": "Status:",
+    "turntable.moduleIdLabel": "Module ID:",
+    "turntable.modulesLabel": "Modules:",
+    "turntable.timeLabel": "Time:",
+    "traysSection.title": "Trays",
+    "traysSection.inTray": "Inbound Tray:",
+    "traysSection.outTray": "Outbound Tray:",
+    "logSection.title": "Messages & Log",
+    "login.prompt": "Please Scan Your Operator Badge to Begin",
+    "login.waiting": "Waiting for scanner input...",
+    "socket.connected": "Successfully connected to the server.",
+    "socket.disconnected": "Disconnected from server",
+    "socket.connectError": "Connection error to server",
+    "log.lineStarted": "Line started successfully.",
+    "log.moduleScanned": "Module {module_id} scanned successfully at Position {position}.",
+    "log.labelsApplied": "Labels applied for {module_id} at Position {position}.",
+    "log.labelCheckFailed": "Error: Label check failed for {module_id} at Position {position}. Module will be rejected.",
+    "log.lowLabelsWarning": "Warning: Low label stock for printer.",
+    "log.modulesLoadedTurntable2": "Modules {modules} loaded onto Turntable 2, Position {position}.",
+    "log.programmingStarted": "Programming started for {module_id}.",
+    "log.comPortOpened": "COM port {port} opened successfully.",
+    "log.comPortOpenError": "Error opening COM port {port}: {error}",
+    "log.comPortClosed": "COM port {port} closed.",
+    "log.barcodeReceived": "Barcode received: {barcodeData}",
+    "log.operatorIdentified": "Operator identified: {operator_name} ({operator_id})",
+    "log.operatorScanFailed": "Operator badge scan failed. ID: {operator_id}",
+    "log.travelLotIdentified": "Travel card identified: {lot_id}, Item: {item_number}",
+    "log.unknownBarcode": "Unknown barcode: {barcodeData}",
+    "log.operatorLoggedIn": "Operator {operator_name} (ID: {operator_id}) logged in.",
+    "log.operatorLoggedOut": "Operator logged out.",
+    "log.operatorLoginRequired": "Operator login required to proceed.",
+    "log.scanOperatorToStartShift": "Please scan operator badge first to start shift.",
+    "log.shiftStarted": "Shift started for operator",
+    "log.shiftEnded": "Shift ended for operator",
+    "log.noActiveShiftToEnd": "No active shift to end. Please log in first.",
+    "log.scanTravelCardPrompt": "Please scan a travel card.",
+    "log.travelCardCleared": "Travel card data cleared.",
+    "log.comManagerInit": "COM Port Manager initialized for port {port} at {baudrate} baud.",
+    "log.comPortOpening": "Attempting to open COM port {port}...",
+    "log.comPortOpenErrorGeneric": "Generic error opening COM port {port}: {error}",
+    "log.comReaderStarted": "COM port reader started for {port}.",
+    "log.rawDataReceived": "Raw data from COM port: {data}",
+    "log.comReaderStopped": "COM port reader stopped for {port}.",
+    "log.validatingOperator": "Validating operator badge ID: {badge_id} via API.",
+    "log.operatorApiValidationFailed": "Operator API validation failed for badge {badge_id}: {error}",
+    "log.operatorApiNoData": "No valid data (VALUES or ERROR_STACK) in API response for operator badge {badge_id}",
+    "log.operatorApiError": "No response or communication error with API for operator badge {badge_id}",
+    "log.operatorApiErrorDetailed": "API Error for operator badge {badge_id}: {error_details}",
+    "log.processingTravelCard": "Operator logged in. Processing barcode as potential travel card: {barcodeData}",
+    "log.unknownBarcodeAfterLogin": "Unknown barcode scanned after login: {barcodeData}",
+    "log.comPortClosing": "Attempting to close COM port {port}...",
+    "log.comManagerStopped": "COM Port Manager stopped for port {port}.",
+    "log.comDataSent": "Data sent to COM port {port}: {data}",
+    "log.comPortNotOpenWrite": "COM port {port} is not open. Cannot send data.",
+    "log.comPortNotOpenOrClosed": "Serial port {port} is not open or has been closed. Stopping reader thread.",
+    "log.comPortCloseError": "Error closing COM port {port}: {error}",
+    "log.appImportError": "Critical error: Could not import global_line_status_data from backend.app",
+    "log.barcodeDecodeError": "Barcode decode error. Raw data (hex): {data_hex}",
+    "log.simulatorInitialized": "Data simulator initialized.",
+    "log.simulatorStarted": "Data simulator thread started.",
+    "log.simulatorStopping": "Data simulator thread stopping."
+}
+
+--- END FILE: .\backend\translations\sr.json ---
+
+--- START FILE: .\backend\utils\__init__.py ---
+
+
+--- END FILE: .\backend\utils\__init__.py ---
+
+--- START FILE: .\backend\utils\logger.py ---
+
+# backend/utils/logger.py
+# Placeholder за бъдеща по-сложна логика за логване.
+# Засега логването се извършва директно в app.py и другите модули чрез print и socketio.emit.
+
+# import logging
+
+# def setup_logger(name, log_file, level=logging.INFO):
+#     """Функция за настройка на логер."""
+#     formatter = logging.Formatter('%(asctime)s %(levelname)s %(name)s: %(message)s')
+#     handler = logging.FileHandler(log_file)
+#     handler.setFormatter(formatter)
+
+#     logger = logging.getLogger(name)
+#     logger.setLevel(level)
+#     logger.addHandler(handler)
+
+#     return logger
+
+# Пример за използване:
+# main_logger = setup_logger('main_app', 'app.log')
+# main_logger.info("Това е информационно съобщение.")
+pass
+
+--- END FILE: .\backend\utils\logger.py ---
+
+--- START FILE: .\templates\index.html ---
+
+<!DOCTYPE html>
+<html lang="{{ current_lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ translations['appTitle'] or 'ASMg Interface' }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="flex flex-col h-screen bg-gray-900 text-gray-200">
+
+    <header class="bg-gray-800 p-4 flex items-center justify-between shadow-lg">
+        <div class="flex items-center">
+            <img src="{{ url_for('static', filename='img/logo_placeholder.png') }}" alt="Company Logo" class="h-10 w-10 rounded-full mr-4">
+            <h1 class="text-3xl font-bold text-white" data-translate-key="mainHeader">{{ translations['mainHeader'] }}</h1>
+        </div>
+        <div class="flex items-center text-lg">
+            <div class="language-switcher mr-4">
+                <select id="language-select" class="bg-gray-700 text-white p-2 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    {% for lang_code_key, lang_name in supported_languages.items() %}
+                    <option value="{{ lang_code_key }}" {% if lang_code_key == current_lang %}selected{% endif %}>{{ lang_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <span id="current-datetime" class="mr-6 text-gray-300"></span>
+            <div class="flex items-center bg-gray-700 px-4 py-2 rounded-lg shadow-md">
+                <span id="overall-status-indicator" class="status-indicator {{ initial_data.overall_status.split('.')[1] if initial_data and initial_data.overall_status else 'idle' }}"></span>
+                <span id="overall-status-text" class="font-semibold" data-translate-key="{{ initial_data.overall_status if initial_data and initial_data.overall_status }}">{{ translations[initial_data.overall_status] if initial_data and initial_data.overall_status in translations else 'Idle' }}</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex flex-1 p-6 overflow-hidden">
+        <div class="w-1/4 bg-gray-800 p-6 rounded-lg shadow-xl mr-6 flex flex-col space-y-6 overflow-y-auto">
+            <div id="task-guidance-section" class="bg-blue-900/50 p-5 rounded-lg shadow-md card text-center border border-blue-500">
+                <h2 class="text-2xl font-bold mb-3 text-white" id="task-title" data-translate-key="task.scanOperator">{{ translations['task.scanOperator'] }}</h2>
+                <p class="text-blue-200" id="task-instruction" data-translate-key="task.waitingForScan">{{ translations['task.waitingForScan'] }}</p>
+            </div>
+            <div class="bg-gray-700 p-5 rounded-lg shadow-md card">
+                <h2 class="text-xl font-semibold mb-4 text-gray-100" data-translate-key="operatorSection.title">{{ translations['operatorSection.title'] }}</h2>
+                <div class="mb-4">
+                    <label class="block text-gray-400 text-sm font-medium mb-1" data-translate-key="operatorSection.idLabel">{{ translations['operatorSection.idLabel'] }}</label>
+                    <p id="operator-id-display" class="text-white text-lg font-medium">--</p>
+                </div>
+                <div>
+                    <span class="block text-gray-400 text-sm font-medium mb-1" data-translate-key="operatorSection.nameLabel">{{ translations['operatorSection.nameLabel'] }}</span>
+                    <p id="operator-name-display" class="text-white text-lg font-medium" data-translate-key="operatorSection.nameDefault">{{ translations['operatorSection.nameDefault'] }}</p>
+                </div>
+                <button id="logout-btn" class="w-full mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200" style="display: none;" data-translate-key="operatorSection.endShiftButton">{{ translations['operatorSection.endShiftButton'] }}</button>
+            </div>
+            <div class="bg-gray-700 p-5 rounded-lg shadow-md card">
+                <h2 class="text-xl font-semibold mb-4 text-gray-100" data-translate-key="travelCardSection.title">{{ translations['travelCardSection.title'] }}</h2>
+                <div class="mb-3">
+                    <label class="block text-gray-400 text-sm font-medium mb-1" data-translate-key="travelCardSection.idLabel">{{ translations['travelCardSection.idLabel'] }}</label>
+                    <p id="travel-lot-id-display" class="text-white text-lg font-medium">--</p>
+                </div>
+                <div class="mb-3">
+                    <span class="block text-gray-400 text-sm font-medium mb-1" data-translate-key="travelCardSection.itemNumberLabel">{{ translations['travelCardSection.itemNumberLabel'] }}</span>
+                    <p id="product-number-display" class="text-white text-lg font-medium">--</p>
+                </div>
+            </div>
+        </div>
+        <div class="w-3/4 bg-gray-800 p-6 rounded-lg shadow-xl flex flex-col overflow-y-auto space-y-6">
+            <h2 class="text-2xl font-semibold text-gray-100" data-translate-key="lineStatusSection.title">{{ translations['lineStatusSection.title'] }}</h2>
+            <div class="bg-gray-700 p-5 rounded-lg shadow-md card">
+                <h3 class="text-xl font-semibold mb-4 text-gray-100" data-translate-key="robotsSection.title">{{ translations['robotsSection.title'] }}</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {% for i in range(1, 4) %}
+                    <div class="flex items-center bg-gray-600 p-3 rounded-lg shadow-sm">
+                        <span id="robot{{i}}-status-indicator" class="status-indicator {{ initial_data.robots[i|string].status.split('.')[1] if initial_data and initial_data.robots and initial_data.robots[i|string] else 'idle' }}"></span>
+                        <span class="font-medium" data-translate-key="robotsSection.robot{{i}}">{{ translations['robotsSection.robot' ~ i] }} <span id="robot{{i}}-status-text" data-translate-key="{{ initial_data.robots[i|string].status if initial_data and initial_data.robots and initial_data.robots[i|string] }}">{{ translations[initial_data.robots[i|string].status] if initial_data and initial_data.robots and initial_data.robots[i|string].status in translations else 'Idle' }}</span></span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+        </div>
+    </main>
+    <footer class="bg-gray-800 p-4 shadow-lg mt-auto">
+        <h2 class="text-xl font-semibold mb-3 text-gray-100" data-translate-key="logSection.title">{{ translations['logSection.title'] }}</h2>
+        <div id="log-panel" class="bg-gray-700 p-4 rounded-lg h-40 overflow-y-auto text-sm font-mono"></div>
+    </footer>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main_app.js') }}"></script>
+</body>
+</html>
+
+--- END FILE: .\templates\index.html ---
+
+--- START FILE: .\static\css\style.css ---
+
+body {
+    font-family: 'Inter', sans-serif;
+    background-color: #111827; /* По-тъмно сиво-синьо за фон */
+    color: #d1d5db; /* По-светъл текст по подразбиране */
+    display: flex; /* Added to ensure footer stays at bottom */
+    flex-direction: column; /* Added for flex layout */
+    min-height: 100vh; /* Ensure body takes at least full viewport height */
+}
+
+main {
+    flex-grow: 1; /* Allow main content to grow and push footer down */
+}
+
+.status-indicator {
+    width: 20px; /* Малко по-малък индикатор */
+    height: 20px;
+    border-radius: 50%;
+    display: inline-block;
+    margin-right: 8px;
+    box-shadow: 0 0 5px rgba(255, 255, 255, 0.3); /* Лек светлинен ефект */
+    flex-shrink: 0; /* Prevent indicator from shrinking */
+}
+
+.status-ok { background-color: #22c55e; } /* По-ярко зелено */
+.status-error { background-color: #ef4444; } /* Червено */
+.status-warning { background-color: #f59e0b; } /* Оранжево/Жълто */
+.status-idle { background-color: #3b82f6; } /* Синьо */
+.status-working { background-color: #6366f1; } /* Индиго */
+.status-maintenance { background-color: #a855f7; } /* Лилаво */
+.status-empty { background-color: #6b7280; } /* Сиво */
+.status-full { background-color: #059669; } /* Тъмно зелено */
+.status-almostfull { background-color: #f59e0b; } /* Оранжево/Жълто */
+
+.log-panel {
+    background-color: #1f2937; /* Darker background for log panel */
+    border: 1px solid #374151;
+    border-radius: 0.375rem; /* rounded-md */
+    padding: 1rem;
+    height: 10rem; /* 160px */
+    overflow-y: auto;
+    font-size: 0.875rem; /* text-sm */
+    color: #9ca3af; /* gray-400 */
+}
+
+.log-entry {
+    padding: 6px 8px;
+    border-bottom: 1px solid #374151; /* По-тъмен разделител */
+    font-size: 0.875rem;
+    line-height: 1.25rem;
+}
+.log-entry:last-child {
+    border-bottom: none;
+}
+.log-error { color: #f87171; } /* По-светло червено за по-добра видимост */
+.log-warning { color: #fbbf24; } /* По-светло жълто */
+.log-info { color: #9ca3af; } /* Светло сиво */
+.log-success { color: #34d399; } /* Светло зелено */
+.log-debug { color: #a78bfa; } /* Светло лилаво */
+
+/* Стил за падащото меню за езици */
+.language-switcher select {
+    background-color: #374151; /* gray-700 */
+    color: white;
+    padding: 0.5rem 2.5rem 0.5rem 1rem; /* Добавено място за стрелката */
+    border-radius: 0.375rem; /* rounded-md */
+    border: 1px solid #4b5563; /* gray-600 */
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    background-image: url("data:image/svg+xml;charset=UTF-8,%3csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='currentColor'%3e%3cpath fill-rule='evenodd' d='M5.293 7.293a1 1 0 011.414 0L10 10.586l3.293-3.293a1 1 0 111.414 1.414l-4 4a1 1 0 01-1.414 0l-4-4a1 1 0 010-1.414z' clip-rule='evenodd'/%3e%3c/svg%3e");
+    background-repeat: no-repeat;
+    background-position: right 0.5rem center;
+    background-size: 1.5em 1.5em;
+}
+.language-switcher select:hover {
+    background-color: #4b5563; /* gray-600 */
+}
+
+/* Стил за Overlay */
+#operator-login-overlay {
+    transition: opacity 0.3s ease-in-out;
+}
+
+/* Полета за въвеждане (ако има) - в случая са <p> тагове за дисплей */
+input[type="text"] { /* Запазваме го, ако решите да добавите полета */
+    background-color: #374151; /* По-тъмно сиво за полетата */
+    border-color: #4b5563; /* По-тъмна граница */
+}
+input[type="text"]:focus {
+    border-color: #60a5fa; /* Синьо при фокус */
+    box-shadow: 0 0 0 2px rgba(96, 165, 250, 0.5); /* Сянка при фокус */
+}
+
+/* Бутони */
+button {
+    transition: background-color 0.2s ease-in-out, transform 0.1s ease-in-out;
+}
+button:hover {
+    filter: brightness(110%);
+}
+button:active {
+    transform: translateY(1px);
+}
+button:disabled {
+    cursor: not-allowed;
+    opacity: 0.6;
+}
+
+/* Карти */
+.card {
+    background-color: #1f2937; /* По-тъмно сиво за картите */
+    border: 1px solid #374151; /* По-тъмна граница за картите */
+    border-radius: 0.5rem; /* rounded-lg */
+    padding: 1.25rem; /* p-5 */
+    box-shadow: 0 10px 15px -3px rgba(0, 0, 0, 0.1), 0 4px 6px -2px rgba(0, 0, 0, 0.05); /* shadow-xl */
+}
+
+--- END FILE: .\static\css\style.css ---
+
+--- START FILE: .\static\js\main_app.js ---
+
+document.addEventListener('DOMContentLoaded', function () {
+    console.log('[JS] DOMContentLoaded - Финална версия заредена.');
+
+    const socket = io(window.location.origin);
+    const langSelect = document.getElementById('language-select');
+    const taskTitle = document.getElementById('task-title');
+    const taskInstruction = document.getElementById('task-instruction');
+    const operatorIdDisplay = document.getElementById('operator-id-display');
+    const operatorNameDisplay = document.getElementById('operator-name-display');
+    const logoutBtn = document.getElementById('logout-btn');
+    const travelLotIdDisplay = document.getElementById('travel-lot-id-display');
+    const productNumberDisplay = document.getElementById('product-number-display');
+    const logPanel = document.getElementById('log-panel');
+    const overallStatusIndicator = document.getElementById('overall-status-indicator');
+    const overallStatusText = document.getElementById('overall-status-text');
+
+    let state = {
+        currentStep: 'awaiting_operator',
+        operator: null,
+        travelLot: null,
+        translations: {}
+    };
+
+    function getTranslation(key) {
+        if (!key || typeof key !== 'string') return '';
+        const keys = key.split('.');
+        let result = state.translations;
+        for (const k of keys) {
+            if (result && typeof result === 'object' && k in result) {
+                result = result[k];
+            } else {
+                return key;
+            }
+        }
+        return result;
+    }
+
+    function updateUI() {
+        console.log(`[UI] Обновяване на UI. Текуща стъпка: ${state.currentStep}`);
+        if (taskTitle && taskInstruction) {
+            switch (state.currentStep) {
+                case 'awaiting_operator':
+                    taskTitle.textContent = getTranslation('task.scanOperator');
+                    taskInstruction.textContent = getTranslation('task.waitingForScan');
+                    break;
+                case 'awaiting_travel_lot':
+                    taskTitle.textContent = getTranslation('task.scanTravelLot');
+                    taskInstruction.innerHTML = `${getTranslation('task.operatorIdentified')}: <strong>${state.operator.name}</strong>. ${getTranslation('task.scanTravelLotPrompt')}`;
+                    break;
+                case 'ready':
+                    taskTitle.textContent = getTranslation('task.ready');
+                    taskInstruction.textContent = getTranslation('task.systemReadyPrompt');
+                    break;
+            }
+        }
+        if(operatorIdDisplay && operatorNameDisplay) {
+            operatorIdDisplay.textContent = state.operator ? state.operator.id : '--';
+            operatorNameDisplay.textContent = state.operator ? state.operator.name : getTranslation('operatorSection.nameDefault');
+        }
+        if(travelLotIdDisplay && productNumberDisplay) {
+            travelLotIdDisplay.textContent = state.travelLot ? state.travelLot.id : '--';
+            productNumberDisplay.textContent = state.travelLot ? state.travelLot.productNumber : '--';
+        }
+        if(logoutBtn) {
+            logoutBtn.style.display = state.operator ? 'block' : 'none';
+        }
+    }
+
+    function addLogEntry(message, level = 'info') {
+        if (!logPanel) return;
+        const translatedMessage = getTranslation(message);
+        const entryDiv = document.createElement('div');
+        entryDiv.classList.add('log-entry', `log-${level}`);
+        const timestamp = new Date().toLocaleTimeString('bg-BG');
+        entryDiv.innerHTML = `<span class="text-gray-500 mr-2">${timestamp}</span> &raquo; <span class="ml-1">${translatedMessage}</span>`;
+        logPanel.insertBefore(entryDiv, logPanel.firstChild);
+    }
+
+    socket.on('connect', () => {
+        console.log('Успешно свързан към сървъра.');
+        socket.emit('request_initial_data');
+    });
+
+    socket.on('initial_data', (data) => {
+        console.log('Получени начални данни.');
+        if (data.translations) {
+            state.translations = data.translations;
+        }
+        if (data.line_status) {
+            // Прилагаме началния статус на машините, получен от сървъра
+            socket.emit('update_status', data.line_status);
+        }
+        document.querySelectorAll('[data-translate-key]').forEach(element => {
+            element.textContent = getTranslation(element.getAttribute('data-translate-key'));
+        });
+        updateUI();
+    });
+
+    socket.on('update_status', (data) => {
+        if (overallStatusIndicator && overallStatusText && data.overall_status) {
+            const statusKey = data.overall_status.split('.')[1] || 'idle';
+            overallStatusIndicator.className = 'status-indicator ' + statusKey;
+            overallStatusText.textContent = getTranslation(data.overall_status);
+        }
+        if (data.robots) {
+            for (let i = 1; i <= 3; i++) {
+                const robotStatusText = document.getElementById(`robot${i}-status-text`);
+                if (robotStatusText && data.robots[i] && data.robots[i].status) {
+                    robotStatusText.textContent = getTranslation(data.robots[i].status);
+                }
+            }
+        }
+    });
+
+    socket.on('barcode_scanned', (data) => {
+        const barcode = data.barcode;
+        addLogEntry(`Получен баркод: ${barcode}`);
+        if (state.currentStep === 'awaiting_operator') {
+            taskInstruction.textContent = `${getTranslation('log.validatingOperator').replace('{badge_id}', barcode)}...`;
+            socket.emit('validate_operator', { 'barcode': barcode });
+        } else if (state.currentStep === 'awaiting_travel_lot') {
+            taskInstruction.textContent = `Проверка на маршрутна карта: ${barcode}...`;
+            socket.emit('validate_travel_lot', { 'barcode': barcode });
+        }
+    });
+
+    socket.on('operator_validation_result', (data) => {
+        if (data.is_valid) {
+            addLogEntry(getTranslation('log.operatorLoggedIn').replace('{operator_name}', data.operator_info.name), 'success');
+            state.operator = data.operator_info;
+            state.currentStep = 'awaiting_travel_lot';
+        } else {
+            addLogEntry('Сканираният бадж не е валиден!', 'error');
+            state.operator = null;
+            state.currentStep = 'awaiting_operator';
+        }
+        updateUI();
+    });
+
+    socket.on('travel_lot_validation_result', (data) => {
+        if (data.is_valid) {
+            let message = getTranslation('log.travelLotIdentified').replace('{lot_id}', data.travel_lot_info.id).replace('{item_number}', data.travel_lot_info.productNumber);
+            addLogEntry(message, 'success');
+            state.travelLot = data.travel_lot_info;
+            state.currentStep = 'ready';
+        } else {
+            addLogEntry('Сканираната маршрутна карта не е валидна!', 'error');
+        }
+        updateUI();
+    });
+
+    socket.on('log_message', (log) => {
+        addLogEntry(log.message, log.level);
+    });
+
+    socket.on('disconnect', () => {
+        addLogEntry('Връзката със сървъра е прекъсната!', 'error');
+    });
+
+    if (langSelect) {
+        langSelect.addEventListener('change', function() {
+            window.location.href = `/set_language/${this.value}`;
+        });
+    }
+
+    if (logoutBtn) {
+        logoutBtn.addEventListener('click', () => {
+            addLogEntry(getTranslation('log.operatorLoggedOut'), 'info');
+            socket.emit('logout_request');
+        });
+    }
+});
+
+--- END FILE: .\static\js\main_app.js ---
+

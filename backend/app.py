@@ -39,13 +39,13 @@ global_line_status_data =\
         "3": {"status": "status.idle", "moduleId": "--", "time": 0},
         "4": {"status": "status.idle", "moduleId": "--", "time": 0}
     },
-    '''
+
     "turntable2": {
         "1": {"status": "status.idle", "moduleIds": [], "time": 0, "progress": 0},
         "2": {"status": "status.idle", "moduleIds": [], "time": 0, "progress": 0},
         "3": {"status": "status.idle", "moduleIds": [], "time": 0, "progress": 0},
         "4": {"status": "status.idle", "moduleIds": [], "time": 0, "progress": 0}
-    },'''
+    },
     "trays": {
         "in": {"status": "status.empty"}, "out": {"status": "status.empty"}
     }
