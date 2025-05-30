@@ -1,0 +1,60 @@
+# Изтриваме стария файл, ако съществува
+$outputFile = "ASMg_Combined_Code.txt"
+if (Test-Path $outputFile) { Remove-Item $outputFile }
+
+Function Add-FileToOutput ($filePath) {
+    Write-Host "Processing: $filePath"
+    Add-Content -Path $outputFile -Value "--- START FILE: $filePath ---"
+    Add-Content -Path $outputFile -Value "" # Празен ред
+    # Проверка дали файлът съществува преди да се опитаме да го прочетем
+    if (Test-Path $filePath) {
+        Get-Content $filePath | Add-Content -Path $outputFile
+    } else {
+        Add-Content -Path $outputFile -Value "!!! FILE NOT FOUND AT: $filePath !!!"
+        Write-Warning "File not found: $filePath"
+    }
+    Add-Content -Path $outputFile -Value "" # Празен ред
+    Add-Content -Path $outputFile -Value "--- END FILE: $filePath ---"
+    Add-Content -Path $outputFile -Value "" # Празен ред
+}
+
+# Главни файлове
+Add-FileToOutput -filePath ".\.gitignore"
+Add-FileToOutput -filePath ".\README.md"
+Add-FileToOutput -filePath ".\requirements.txt"
+Add-FileToOutput -filePath ".\run.py"
+Add-FileToOutput -filePath ".\Asmg.bat" # Ако все още го имате и е релевантен
+
+# Backend файлове
+Add-FileToOutput -filePath ".\backend\__init__.py"
+Add-FileToOutput -filePath ".\backend\app.py"
+Add-FileToOutput -filePath ".\backend\config.py"
+
+Add-FileToOutput -filePath ".\backend\api\__init__.py"
+Add-FileToOutput -filePath ".\backend\api\machine_status.py"
+Add-FileToOutput -filePath ".\backend\api\operator_routes.py"
+Add-FileToOutput -filePath ".\backend\api\travel_lot.py"
+
+Add-FileToOutput -filePath ".\backend\services\__init__.py"
+Add-FileToOutput -filePath ".\backend\services\com_port_manager.py"
+Add-FileToOutput -filePath ".\backend\services\data_simulator.py"
+Add-FileToOutput -filePath ".\backend\services\opc_ua_client.py"
+Add-FileToOutput -filePath ".\backend\services\traceability_api.py"
+
+Add-FileToOutput -filePath ".\backend\translations\__init__.py"
+Add-FileToOutput -filePath ".\backend\translations\translation_manager.py"
+Add-FileToOutput -filePath ".\backend\translations\bg.json"
+Add-FileToOutput -filePath ".\backend\translations\en.json"
+Add-FileToOutput -filePath ".\backend\translations\sr.json"
+
+Add-FileToOutput -filePath ".\backend\utils\__init__.py"
+Add-FileToOutput -filePath ".\backend\utils\logger.py"
+
+# Template файлове
+Add-FileToOutput -filePath ".\templates\index.html"
+
+# Static файлове
+Add-FileToOutput -filePath ".\static\css\style.css"
+Add-FileToOutput -filePath ".\static\js\main_app.js"
+
+Write-Host "Готово! Съдържанието е събрано в $outputFile"

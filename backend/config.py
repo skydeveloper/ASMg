@@ -27,5 +27,7 @@ class Config:
     # Стойности, взети от предоставения traceability_api.py
     TRACEABILITY_API_URL = os.environ.get('TRACEABILITY_API_URL', "http://oracleapi:3000") #
     TRACEABILITY_API_KEY = os.environ.get('TRACEABILITY_API_KEY', "2512A449C4B001DBE0639F2B230AF06F") #
-    TRACEABILITY_WORKPLACE_ID = os.environ.get('TRACEABILITY_WORKPLACE_ID', "1443") #
+    #TRACEABILITY_WORKPLACE_ID = os.environ.get('TRACEABILITY_WORKPLACE_ID', "1443") #
+    TRACEABILITY_WORKPLACE_ID = os.environ.get('TRACEABILITY_WORKPLACE_ID', "2400")  #
+
     # Забележка: В тестовете на traceability_api.py се използва и "2400" като P_RDNO. Уточнете кой е правилният за основната конфигурация.

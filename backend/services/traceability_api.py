@@ -29,12 +29,12 @@ class TraceabilityAPI:
             self.logger.debug(message)
         else:
             self.logger.info(message)
-
+    '''
     def send_request(self, procedure, params):
         """Изпраща заявка към Traceability API."""
         payload = {
             "OWNER": "TRANS",
-            "PACKAGE": "",  # или "SENSITECH", ако е глобално за всички процедури
+            "PACKAGE": "AUTOMATION_FTPCK",  # или "SENSITECH", ако е глобално за всички процедури
             "PROCEDURE": procedure,
             "PARAMS": params
         }
@@ -64,6 +64,41 @@ class TraceabilityAPI:
             self._log('error',
                       f"Traceability API - Error decoding JSON response for {procedure}: {json_err} - Response was: {response.text if 'response' in locals() else 'N/A'}")
         return None
+    '''
+    def send_request(self, procedure, params, package=""):
+        """Изпраща заявка към Traceability API."""
+        payload = {
+            "OWNER": "TRANS",
+            "PACKAGE": package,  # Вече е параметър с default стойност ""
+            "PROCEDURE": procedure,
+            "PARAMS": params
+        }
+        self._log('debug',
+                  f"Traceability API Request: URL={self.base_url}/executeProcedure, Payload={json.dumps(payload)}")
+
+        try:
+            response = requests.post(f"{self.base_url}/executeProcedure",
+                                     headers=self.headers,
+                                     data=json.dumps(payload),
+                                     verify=False,
+                                     timeout=10)
+            self._log('debug',
+                      f"Traceability API Response: Status={response.status_code}, Body={response.text[:500]}")
+            response.raise_for_status()
+            return response.json()
+        except requests.exceptions.HTTPError as http_err:
+            self._log('error',
+                      f"Traceability API - HTTP error for {procedure}: {http_err} - Response: {response.text if 'response' in locals() else 'N/A'}")
+        except requests.exceptions.ConnectionError as conn_err:
+            self._log('error', f"Traceability API - Connection error for {procedure}: {conn_err}")
+        except requests.exceptions.Timeout as timeout_err:
+            self._log('error', f"Traceability API - Timeout error for {procedure}: {timeout_err}")
+        except requests.exceptions.RequestException as req_err:
+            self._log('error', f"Traceability API - General request error for {procedure}: {req_err}")
+        except json.JSONDecodeError as json_err:
+            self._log('error',
+                      f"Traceability API - Error decoding JSON response for {procedure}: {json_err} - Response was: {response.text if 'response' in locals() else 'N/A'}")
+        return None
 
     # STEP1: Validate Operator Badge
     def validate_operator_badge(self, reader_id):
@@ -71,6 +106,7 @@ class TraceabilityAPI:
         params = {"P_READER": reader_id}
         return self.send_request("GET_VALID_EMNOEXT", params)
 
+    '''
     # STEP2: Register operation and operator
     def ftpck_new_order(self, workplace_id, route_map, employee_id):
         self._log('info',
@@ -81,6 +117,18 @@ class TraceabilityAPI:
             "P_EMNO": employee_id
         }
         return self.send_request("FTPCK_NEW_ORDER", params)
+    '''
+    # STEP2: Register operation and operator
+    def ftpck_new_order(self, workplace_id, route_map, employee_id):
+        self._log('info',
+                  f"Registering new order: Workplace={workplace_id}, RouteMap={route_map}, Employee={employee_id}")
+        params = {
+            "P_RDNO": workplace_id,
+            "P_ROUTE_MAP": route_map,
+            "P_EMNO": employee_id
+        }
+        # Променете извикването на send_request, за да подадете PACKAGE
+        return self.send_request("FTPCK_NEW_ORDER", params, package="AUTOMATION_FTPCK")
 
     # STEP3: Register  Package
     def pck_new_pack(self, workplace_id, pack_barcode):
@@ -192,3 +240,6 @@ if __name__ == "__main__":
     # ... (останалите тестове от вашия файл, ако желаете) ...
 
     test_logger.info("✅ Всички тестове завършени!")
+
+
+
