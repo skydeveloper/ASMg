@@ -78,7 +78,6 @@ document.addEventListener('DOMContentLoaded', function () {
 
     function handleStatusUpdate(data) {
         if (!data) return;
-        // console.log("Получен нов статус на линията:", data);
         if (overallStatusIndicator && overallStatusText && data.overall_status) {
             const statusKey = data.overall_status.split('.')[1] || 'idle';
             overallStatusIndicator.className = 'status-indicator ' + statusKey;
