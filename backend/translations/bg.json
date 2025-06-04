@@ -115,5 +115,20 @@
     },
     "error": {
         "missingTestData": "Липсват данни за стартиране на тест/задача към устройство."
+    },
+    "testInterface":
+    {
+        "title": "АСМг - Тестов Интерфейс за Устройства",
+        "header": "Тестов Интерфейс за Device Clients",
+        "sendCommandTitle": "Изпрати команда към Device Client",
+        "deviceIp": "IP на Устройство:",
+        "devicePort": "Порт на Устройство:",
+        "itemName": "Име/ID на Изделие (за DeviceClient):",
+        "taskDetails": "Детайли за Задачата/Фърмуер:",
+        "serialNumbersTitle": "Серийни номера (до 4):",
+        "slotActive": "Гнездо активно",
+        "sendStartCommand": "Изпрати Команда към Device Client (чрез ASMg)",
+        "logTitle": "Лог на Тестовия Интерфейс:",
+        "logWaiting": "Очаквам събития..."
     }
 }

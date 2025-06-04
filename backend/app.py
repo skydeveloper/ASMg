@@ -136,27 +136,12 @@ def set_language_route(lang_code):
 @app.route('/test_device_interface')
 def test_device_interface_page():
     lang_code = session.get('language', Config.DEFAULT_LANGUAGE)
+    # Вече не дефинираме твърдо кодиран речник тук.
+    # Просто зареждаме правилния превод от JSON файловете.
     current_translations = translation_data.get(lang_code, translation_data.get(Config.DEFAULT_LANGUAGE, {}))
 
-    test_interface_specific_keys = {
-        "testInterface.title": "ASMg - Тестов Интерфейс за Устройства",
-        "testInterface.header": "Тестов Интерфейс за Device Clients",
-        "testInterface.sendCommandTitle": "Изпрати команда към Device Client",
-        "testInterface.deviceIp": "IP на Устройство:",
-        "testInterface.devicePort": "Порт на Устройство:",
-        "testInterface.itemName": "Име/ID на Изделие (за DeviceClient):",
-        "testInterface.taskDetails": "Детайли за Задачата/Фърмуер:",
-        "testInterface.serialNumbersTitle": "Серийни номера (до 4):",
-        "testInterface.slotActive": "Гнездо активно",
-        "testInterface.sendStartCommand": "Изпрати Команда към Device Client (чрез ASMg)",
-        "testInterface.logTitle": "Лог на Тестовия Интерфейс:",
-        "testInterface.logWaiting": "Очаквам събития..."
-    }
-    # Обединяваме ги, като тези от JSON файла имат предимство, ако съществуват
-    final_translations_for_test_page = {**test_interface_specific_keys, **current_translations}
-
     return render_template('test_interface.html',
-                           translations=final_translations_for_test_page,
+                           translations=current_translations, # Подаваме стандартния речник
                            current_lang=lang_code,
                            supported_languages=Config.SUPPORTED_LANGUAGES)
 

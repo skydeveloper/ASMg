@@ -96,5 +96,20 @@
         "simulatorInitialized": "Data simulator initialized.",
         "simulatorStarted": "Data simulator started.",
         "simulatorStopping": "Data simulator stopping."
+    },
+    "testInterface":
+    {
+        "title": "ASMg - Device Test Interface",
+        "header": "Device Clients Test Interface",
+        "sendCommandTitle": "Send Command to Device Client",
+        "deviceIp": "Device IP:",
+        "devicePort": "Device Port:",
+        "itemName": "Item Name/ID (for DeviceClient):",
+        "taskDetails": "Task/Firmware Details:",
+        "serialNumbersTitle": "Serial Numbers (up to 4):",
+        "slotActive": "Slot Active",
+        "sendStartCommand": "Send Command to Device Client (via ASMg)",
+        "logTitle": "Test Interface Log:",
+        "logWaiting": "Waiting for events..."
     }
 }

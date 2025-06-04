@@ -96,5 +96,20 @@
         "simulatorInitialized": "Симулатор података покренут.",
         "simulatorStarted": "Симулатор података је покренут.",
         "simulatorStopping": "Симулатор података се зауставља."
+    },
+    "testInterface":
+    {
+        "title": "АСМг - Тестни Интерфејс за Уређаје",
+        "header": "Тестни Интерфејс за Device Clients",
+        "sendCommandTitle": "Пошаљи команду Device Client-у",
+        "deviceIp": "IP уређаја:",
+        "devicePort": "Порт уређаја:",
+        "itemName": "Име/ID артикла (за DeviceClient):",
+        "taskDetails": "Детаљи задатка/фирмвера:",
+        "serialNumbersTitle": "Серијски бројеви (до 4):",
+        "slotActive": "Слот активан",
+        "sendStartCommand": "Пошаљи команду Device Client-у (преко ASMg)",
+        "logTitle": "Лог Тестног Интерфејса:",
+        "logWaiting": "Чекају се догађаји..."
     }
 }
