@@ -1,0 +1,100 @@
+{
+    "appTitle": "АСМг - Контролни Центар Линије",
+    "mainHeader": "Информациона Табла Линије",
+    "status": {
+        "running": "Ради",
+        "stopped": "Заустављена",
+        "error": "Грешка",
+        "warning": "Упозорење",
+        "idle": "Неактиван",
+        "ok": "ОК",
+        "working": "У раду",
+        "okFull": "ОК (Пуна)",
+        "almostFull": "Скоро пуна",
+        "empty": "Празна",
+        "maintenance": "Одржавање",
+        "waitingForLoad": "Чека утовар",
+        "waitingForUnload": "Чека истовар",
+        "disconnected": "Веза прекинута"
+    },
+    "task": {
+        "scanOperator": "Скенирајте оператерску картицу",
+        "scanTravelLot": "Скенирајте радни налог",
+        "waitingForScan": "Молимо користите баркод скенер.",
+        "operatorIdentified": "Оператер",
+        "scanTravelLotPrompt": "Молимо скенирајте радни налог.",
+        "ready": "Спреман за рад",
+        "systemReadyPrompt": "Сви подаци унети. Линија је спремна."
+    },
+    "operatorSection": {
+        "title": "Оператер",
+        "idLabel": "ID картице:",
+        "nameLabel": "Име:",
+        "nameDefault": "Није пријављен",
+        "endShiftButton": "Крај смене / Одјава"
+    },
+    "travelCardSection": {
+        "title": "Радни Налог",
+        "idLabel": "ID Радног Налога:",
+        "itemNumberLabel": "Број артикла:",
+        "itemDescriptionLabel": "Опис:",
+        "orderNumberLabel": "Број наруџбе:",
+        "quantityLabel": "Количина:"
+    },
+    "lineStatusSection": {
+        "title": "Статус Линије"
+    },
+    "robotsSection": {
+        "title": "Роботи",
+        "robot1": "Робот 1:",
+        "robot2": "Робот 2:",
+        "robot3": "Робот 3:"
+    },
+    "turntable1": {
+        "title": "Рингишпил 1 (Етикетирање)",
+        "position1": "Позиција 1",
+        "position2": "Позиција 2",
+        "position3": "Позиција 3",
+        "position4": "Позиција 4"
+    },
+    "turntable2": {
+        "title": "Рингишпил 2 (Тестирање)",
+        "position1": "Позиција 1",
+        "position2": "Позиција 2",
+        "position3": "Позиција 3",
+        "position4": "Позиција 4"
+    },
+    "turntable": {
+        "statusLabel": "Статус:",
+        "moduleIdLabel": "ID Модула:",
+        "modulesLabel": "Модули:",
+        "timeLabel": "Време:"
+    },
+    "traysSection": {
+        "title": "Посуде",
+        "inTray": "Улазна:",
+        "outTray": "Излазна:"
+    },
+    "logSection": {
+        "title": "Системске Поруке"
+    },
+    "socket": {
+        "connected": "Успешно повезивање са сервером."
+    },
+    "log": {
+        "comPortOpened": "COM порт {port} је успешно отворен.",
+        "comPortOpenError": "Грешка при отварању COM порта {port}: {error}",
+        "comPortClosed": "COM порт {port} је затворен.",
+        "barcodeReceived": "Примљен баркод: {barcodeData}",
+        "operatorLoggedIn": "Оператер {operator_name} се пријавио.",
+        "operatorLoggedOut": "Оператер се одјавио.",
+        "validatingOperator": "Валидација оператерске картице: {badge_id}",
+        "operatorApiValidationFailed": "API валидација оператера неуспешна: {error}",
+        "operatorApiError": "Грешка у комуникацији са API за оператерску картицу {badge_id}",
+        "travelLotIdentified": "Радни налог идентификован: {lot_id}, Артикал: {item_number}",
+        "travelCardCleared": "Подаци о радном налогу обрисани.",
+        "simulatorInitialized": "Симулатор података покренут.",
+        "simulatorStarted": "Симулатор података је покренут.",
+        "simulatorStopping": "Симулатор података се зауставља."
+    }
+}

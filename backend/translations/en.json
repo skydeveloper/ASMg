@@ -1,0 +1,100 @@
+{
+    "appTitle": "ASMg - Production Line Control Center",
+    "mainHeader": "Line Information Dashboard",
+    "status": {
+        "running": "Running",
+        "stopped": "Stopped",
+        "error": "Error",
+        "warning": "Warning",
+        "idle": "Idle",
+        "ok": "OK",
+        "working": "Working",
+        "okFull": "OK (Full)",
+        "almostFull": "Almost Full",
+        "empty": "Empty",
+        "maintenance": "Maintenance",
+        "waitingForLoad": "Waiting for Load",
+        "waitingForUnload": "Waiting for Unload",
+        "disconnected": "Disconnected"
+    },
+    "task": {
+        "scanOperator": "Scan Operator Badge",
+        "scanTravelLot": "Scan Travel Card",
+        "waitingForScan": "Please use the barcode scanner.",
+        "operatorIdentified": "Operator",
+        "scanTravelLotPrompt": "Please scan the travel card.",
+        "ready": "Ready for Work",
+        "systemReadyPrompt": "All data entered. The line is ready."
+    },
+    "operatorSection": {
+        "title": "Operator",
+        "idLabel": "Badge ID:",
+        "nameLabel": "Name:",
+        "nameDefault": "Not logged in",
+        "endShiftButton": "End Shift / Logout"
+    },
+    "travelCardSection": {
+        "title": "Travel Card",
+        "idLabel": "Travel Card ID:",
+        "itemNumberLabel": "Item Number:",
+        "itemDescriptionLabel": "Description:",
+        "orderNumberLabel": "Order Number:",
+        "quantityLabel": "Quantity:"
+    },
+    "lineStatusSection": {
+        "title": "Line Status"
+    },
+    "robotsSection": {
+        "title": "Robots",
+        "robot1": "Robot 1:",
+        "robot2": "Robot 2:",
+        "robot3": "Robot 3:"
+    },
+    "turntable1": {
+        "title": "Turntable 1 (Labeling)",
+        "position1": "Position 1",
+        "position2": "Position 2",
+        "position3": "Position 3",
+        "position4": "Position 4"
+    },
+    "turntable2": {
+        "title": "Turntable 2 (Testing)",
+        "position1": "Position 1",
+        "position2": "Position 2",
+        "position3": "Position 3",
+        "position4": "Position 4"
+    },
+    "turntable": {
+        "statusLabel": "Status:",
+        "moduleIdLabel": "Module ID:",
+        "modulesLabel": "Modules:",
+        "timeLabel": "Time:"
+    },
+    "traysSection": {
+        "title": "Trays",
+        "inTray": "Inbound:",
+        "outTray": "Outbound:"
+    },
+    "logSection": {
+        "title": "System Messages"
+    },
+    "socket": {
+        "connected": "Successfully connected to the server."
+    },
+    "log": {
+        "comPortOpened": "COM port {port} opened successfully.",
+        "comPortOpenError": "Error opening COM port {port}: {error}",
+        "comPortClosed": "COM port {port} closed.",
+        "barcodeReceived": "Barcode received: {barcodeData}",
+        "operatorLoggedIn": "Operator {operator_name} logged in.",
+        "operatorLoggedOut": "Operator logged out.",
+        "validatingOperator": "Validating operator badge: {badge_id}",
+        "operatorApiValidationFailed": "Operator API validation failed: {error}",
+        "operatorApiError": "API communication error for operator badge {badge_id}",
+        "travelLotIdentified": "Travel card identified: {lot_id}, Item: {item_number}",
+        "travelCardCleared": "Travel card data cleared.",
+        "simulatorInitialized": "Data simulator initialized.",
+        "simulatorStarted": "Data simulator started.",
+        "simulatorStopping": "Data simulator stopping."
+    }
+}

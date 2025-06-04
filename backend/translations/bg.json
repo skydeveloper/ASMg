@@ -1,0 +1,102 @@
+{
+    "appTitle": "АСМг - Център за Управление",
+    "mainHeader": "Информационно Табло на Линията",
+    "status": {
+        "running": "Работи",
+        "stopped": "Спряна",
+        "error": "Грешка",
+        "warning": "Предупреждение",
+        "idle": "Изчакване",
+        "ok": "ОК",
+        "working": "В действие",
+        "okFull": "ОК (Пълна)",
+        "almostFull": "Почти пълна",
+        "empty": "Празна",
+        "maintenance": "Поддръжка",
+        "waitingForLoad": "Чака зареждане",
+        "waitingForUnload": "Чака разтоварване",
+        "disconnected": "Прекъсната връзка"
+    },
+    "task": {
+        "scanOperator": "Сканирай бадж на оператор",
+        "scanTravelLot": "Сканирай маршрутна карта",
+        "waitingForScan": "Моля, използвайте баркод скенера.",
+        "operatorIdentified": "Оператор",
+        "scanTravelLotPrompt": "Моля, сканирайте маршрутна карта.",
+        "ready": "Готовност за работа",
+        "systemReadyPrompt": "Всички данни са въведени. Линията е готова."
+    },
+    "operatorSection": {
+        "title": "Оператор",
+        "idLabel": "ID на бадж:",
+        "nameLabel": "Име:",
+        "nameDefault": "Няма въведен",
+        "endShiftButton": "Край на Смяна / Изход"
+    },
+    "travelCardSection": {
+        "title": "Пътна Карта",
+        "idLabel": "ID на Пътна Карта:",
+        "itemNumberLabel": "Номер на Изделие:",
+        "itemDescriptionLabel": "Описание:",
+        "orderNumberLabel": "Номер на Поръчка:",
+        "quantityLabel": "Количество:",
+        "loadButton": "Зареди",
+        "clearButton": "Изчисти"
+    },
+    "lineStatusSection": {
+        "title": "Статус на Линията"
+    },
+    "robotsSection": {
+        "title": "Роботи",
+        "robot1": "Робот 1:",
+        "robot2": "Робот 2:",
+        "robot3": "Робот 3:"
+    },
+    "turntable1": {
+        "title": "Въртележка 1 (Етикетиране)",
+        "position1": "Позиция 1",
+        "position2": "Позиция 2",
+        "position3": "Позиция 3",
+        "position4": "Позиция 4"
+    },
+    "turntable2": {
+        "title": "Въртележка 2 (Тестване)",
+        "position1": "Позиция 1",
+        "position2": "Позиция 2",
+        "position3": "Позиция 3",
+        "position4": "Позиция 4"
+    },
+    "turntable": {
+        "statusLabel": "Статус:",
+        "moduleIdLabel": "ID на Модул:",
+        "modulesLabel": "Модули:",
+        "timeLabel": "Време:"
+    },
+    "traysSection": {
+        "title": "Тави",
+        "inTray": "Входяща:",
+        "outTray": "Изходяща:"
+    },
+    "logSection": {
+        "title": "Системни Съобщения"
+    },
+    "socket": {
+        "connected": "Успешно свързване със сървъра."
+    },
+    "log": {
+        "comPortOpened": "COM порт {port} е отворен успешно.",
+        "comPortOpenError": "Грешка при отваряне на COM порт {port}: {error}",
+        "comPortClosed": "COM порт {port} е затворен.",
+        "barcodeReceived": "Получен баркод: {barcodeData}",
+        "operatorLoggedIn": "Оператор {operator_name} влезе в системата.",
+        "operatorLoggedOut": "Оператор излезе от системата.",
+        "validatingOperator": "Валидиране на операторски бадж: {badge_id}",
+        "operatorApiValidationFailed": "API валидацията на оператор неуспешна: {error}",
+        "operatorApiError": "Грешка при комуникация с API за операторски бадж {badge_id}",
+        "travelLotIdentified": "Пътна карта идентифицирана: {lot_id}, Изделие: {item_number}",
+        "travelCardCleared": "Данните за пътната карта са изчистени.",
+        "simulatorInitialized": "Симулаторът на данни е инициализиран.",
+        "simulatorStarted": "Симулаторът на данни е стартиран.",
+        "simulatorStopping": "Симулаторът на данни спира."
+    }
+}

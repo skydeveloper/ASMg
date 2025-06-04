@@ -1,0 +1,141 @@
+<!DOCTYPE html>
+<html lang="{{ current_lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ translations['appTitle'] or 'ASMg Interface' }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+</head>
+<body class="flex flex-col h-screen bg-gray-900 text-gray-200">
+
+    <header class="bg-gray-800 p-4 flex items-center justify-between shadow-lg">
+        <div class="flex items-center">
+            <img src="{{ url_for('static', filename='img/logo_placeholder.png') }}" alt="Company Logo" class="h-10 w-10 rounded-full mr-4">
+            <h1 class="text-3xl font-bold text-white" data-translate-key="mainHeader">{{ translations.mainHeader }}</h1>
+        </div>
+        <div class="flex items-center text-lg">
+            <div class="language-switcher mr-4">
+                <select id="language-select" class="bg-gray-700 text-white p-2 rounded-md border border-gray-600 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                    {% for lang_code_key, lang_name in supported_languages.items() %}
+                    <option value="{{ lang_code_key }}" {% if lang_code_key == current_lang %}selected{% endif %}>{{ lang_name }}</option>
+                    {% endfor %}
+                </select>
+            </div>
+            <span id="current-datetime" class="mr-6 text-gray-300"></span>
+            <div class="flex items-center bg-gray-700 px-4 py-2 rounded-lg shadow-md">
+                <span id="overall-status-indicator" class="status-indicator idle"></span>
+                <span id="overall-status-text" class="font-semibold" data-translate-key="status.idle">{{ translations['status.idle'] }}</span>
+            </div>
+        </div>
+    </header>
+
+    <main class="flex flex-1 p-6 overflow-hidden">
+        <div class="w-1/4 bg-gray-800 p-6 rounded-lg shadow-xl mr-6 flex flex-col space-y-6 overflow-y-auto">
+            <div id="task-guidance-section" class="bg-blue-900/50 p-5 rounded-lg shadow-md card text-center border border-blue-500">
+                <h2 class="text-2xl font-bold mb-3 text-white" id="task-title" data-translate-key="task.scanOperator">{{ translations['task.scanOperator'] }}</h2>
+                <p class="text-blue-200" id="task-instruction" data-translate-key="task.waitingForScan">{{ translations['task.waitingForScan'] }}</p>
+            </div>
+            <div class="bg-gray-700 p-5 rounded-lg shadow-md card">
+                <h2 class="text-xl font-semibold mb-4 text-gray-100" data-translate-key="operatorSection.title">{{ translations['operatorSection.title'] }}</h2>
+                <div class="mb-4">
+                    <label class="block text-gray-400 text-sm font-medium mb-1" data-translate-key="operatorSection.idLabel">{{ translations['operatorSection.idLabel'] }}</label>
+                    <p id="operator-id-display" class="text-white text-lg font-medium">--</p>
+                </div>
+                <div>
+                    <span class="block text-gray-400 text-sm font-medium mb-1" data-translate-key="operatorSection.nameLabel">{{ translations['operatorSection.nameLabel'] }}</span>
+                    <p id="operator-name-display" class="text-white text-lg font-medium" data-translate-key="operatorSection.nameDefault">{{ translations['operatorSection.nameDefault'] }}</p>
+                </div>
+                <button id="logout-btn" class="w-full mt-4 bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded-lg shadow-md transition duration-200" style="display: none;" data-translate-key="operatorSection.endShiftButton">{{ translations['operatorSection.endShiftButton'] }}</button>
+            </div>
+            <div class="bg-gray-700 p-5 rounded-lg shadow-md card">
+                <h2 class="text-xl font-semibold mb-4 text-gray-100" data-translate-key="travelCardSection.title">{{ translations['travelCardSection.title'] }}</h2>
+                <div class="mb-3">
+                    <label class="block text-gray-400 text-sm font-medium mb-1" data-translate-key="travelCardSection.idLabel">{{ translations['travelCardSection.idLabel'] }}</label>
+                    <p id="travel-lot-id-display" class="text-white text-lg font-medium">--</p>
+                </div>
+                <div class="mb-3">
+                    <span class="block text-gray-400 text-sm font-medium mb-1" data-translate-key="travelCardSection.itemNumberLabel">{{ translations['travelCardSection.itemNumberLabel'] }}</span>
+                    <p id="product-number-display" class="text-white text-lg font-medium">--</p>
+                </div>
+            </div>
+        </div>
+
+        <div class="w-3/4 bg-gray-800 p-6 rounded-lg shadow-xl flex flex-col overflow-y-auto space-y-6">
+            <h2 class="text-2xl font-semibold text-gray-100" data-translate-key="lineStatusSection.title">{{ translations['lineStatusSection.title'] }}</h2>
+
+            <div class="bg-gray-700 p-5 rounded-lg shadow-md card">
+                <h3 class="text-xl font-semibold mb-4 text-gray-100" data-translate-key="robotsSection.title">{{ translations['robotsSection.title'] }}</h3>
+                <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
+                    {% for i in range(1, 4) %}
+                    <div class="flex items-center bg-gray-600 p-3 rounded-lg shadow-sm">
+                        <span id="robot{{i}}-status-indicator" class="status-indicator idle"></span>
+                        <span class="font-medium" data-translate-key="robotsSection.robot{{i}}">{{ translations['robotsSection.robot' ~ i] }} <span id="robot{{i}}-status-text" data-translate-key="status.idle">{{ translations['status.idle'] }}</span></span>
+                    </div>
+                    {% endfor %}
+                </div>
+            </div>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                <div class="bg-gray-700 p-5 rounded-lg shadow-md flex flex-col card">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-100" data-translate-key="turntable1.title">{{ translations['turntable1.title'] }}</h3>
+                    <div class="space-y-3 flex-1">
+                        {% for i in range(1, 5) %}
+                        <div class="bg-gray-600 p-3 rounded-lg shadow-sm">
+                            <h4 class="font-semibold text-gray-300 mb-1" data-translate-key="turntable1.position{{i}}">{{ translations['turntable1.position' ~ i] }}</h4>
+                            <p class="text-xs text-gray-400" data-translate-key="turntable.moduleIdLabel">{{ translations['turntable.moduleIdLabel'] }} <span id="v1p{{i}}-module-id">--</span></p>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+                <div class="bg-gray-700 p-5 rounded-lg shadow-md flex flex-col card">
+                    <h3 class="text-xl font-semibold mb-4 text-gray-100" data-translate-key="turntable2.title">{{ translations['turntable2.title'] }}</h3>
+                     <div class="space-y-3 flex-1">
+                        {% for i in range(1, 5) %}
+                        <div class="bg-gray-600 p-3 rounded-lg shadow-sm">
+                            <h4 class="font-semibold text-gray-300 mb-1" data-translate-key="turntable2.position{{i}}">{{ translations['turntable2.position' ~ i] }}</h4>
+                            <p class="text-xs text-gray-400" data-translate-key="turntable.modulesLabel">{{ translations['turntable.modulesLabel'] }} <span id="v2p{{i}}-module-ids">--</span></p>
+                            <div class="w-full bg-gray-500 rounded-full h-2.5 mt-2">
+                                <div id="v2p{{i}}-progress" class="bg-blue-500 h-2.5 rounded-full" style="width: 0%"></div>
+                            </div>
+                        </div>
+                        {% endfor %}
+                    </div>
+                </div>
+            </div>
+
+            <div class="bg-gray-700 p-5 rounded-lg shadow-md card">
+                <h3 class="text-xl font-semibold mb-4 text-gray-100" data-translate-key="traysSection.title">{{ translations['traysSection.title'] }}</h3>
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                    <div class="flex items-center bg-gray-600 p-3 rounded-lg shadow-sm">
+                        <span id="tray-in-status-indicator" class="status-indicator empty"></span>
+                        <span class="font-medium" data-translate-key="traysSection.inTray">{{ translations['traysSection.inTray'] }} <span id="tray-in-status-text" data-translate-key="status.empty">{{ translations['status.empty'] }}</span></span>
+                    </div>
+                    <div class="flex items-center bg-gray-600 p-3 rounded-lg shadow-sm">
+                        <span id="tray-out-status-indicator" class="status-indicator empty"></span>
+                        <span class="font-medium" data-translate-key="traysSection.outTray">{{ translations['traysSection.outTray'] }} <span id="tray-out-status-text" data-translate-key="status.empty">{{ translations['status.empty'] }}</span></span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div id="module-actions-panel" style="display:none;">
+            <h4 data-translate-key="actions.title">{{translations['actions.title']}}</h4>
+            <p>Модул ID: <span id="action-module-id"></span></p>
+            <button id="btn-start-test-tester1" class="bg-green-500 p-2 rounded" data-translate-key="actions.startTest">
+                {{translations['actions.startTest']}}
+            </button>
+        </div>
+
+    </main>
+
+    <footer class="bg-gray-800 p-4 shadow-lg mt-auto">
+        <h2 class="text-xl font-semibold mb-3 text-gray-100" data-translate-key="logSection.title">{{ translations['logSection.title'] }}</h2>
+        <div id="log-panel" class="bg-gray-700 p-4 rounded-lg h-40 overflow-y-auto text-sm font-mono"></div>
+    </footer>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <script src="{{ url_for('static', filename='js/main_app.js') }}"></script>
+</body>
+</html>
