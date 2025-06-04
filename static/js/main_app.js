@@ -1,5 +1,5 @@
 document.addEventListener('DOMContentLoaded', function () {
-    console.log('[JS] DOMContentLoaded - Финална версия заредена.');
+    console.log('[JS] DOMContentLoaded - Финална синхронизирана версия заредена.');
 
     const socket = io(window.location.origin);
     const langSelect = document.getElementById('language-select');
@@ -36,7 +36,6 @@ document.addEventListener('DOMContentLoaded', function () {
     }
 
     function updateUI() {
-        console.log(`[UI] Обновяване на UI. Текуща стъпка: ${state.currentStep}`);
         if (taskTitle) taskTitle.textContent = getTranslation(state.currentStep === 'awaiting_operator' ? 'task.scanOperator' : state.currentStep === 'awaiting_travel_lot' ? 'task.scanTravelLot' : 'task.ready');
         if (taskInstruction) {
             if (state.currentStep === 'awaiting_operator') taskInstruction.textContent = getTranslation('task.waitingForScan');
@@ -53,8 +52,7 @@ document.addEventListener('DOMContentLoaded', function () {
     function addLogEntry(message, level = 'info') {
         if (!logPanel) return;
         let displayMessage = message;
-        // Опитваме да преведем, само ако съобщението не съдържа вече форматирани данни (рядко, но за всеки случай)
-        if (message && !message.includes('{') && !message.includes('}')) {
+        if (message && typeof message === 'string' && !message.includes('{') && !message.includes('}')) {
             displayMessage = getTranslation(message);
         }
         const entryDiv = document.createElement('div');
@@ -64,29 +62,32 @@ document.addEventListener('DOMContentLoaded', function () {
         logPanel.insertBefore(entryDiv, logPanel.firstChild);
     }
 
-    function applyAllStaticTranslations() {
+    function applyStaticTranslations() {
         document.querySelectorAll('[data-translate-key]').forEach(element => {
             const key = element.getAttribute('data-translate-key');
-            // Превеждаме само елементи, които не се управляват директно от updateUI или handleStatusUpdate за динамични стойности
+            // Тези се управляват от updateUI или handleStatusUpdate
             if (element.id !== 'task-title' &&
                 element.id !== 'task-instruction' &&
-                element.id !== 'operator-name-display' && // Управлява се от updateUI
-                element.id !== 'overall-status-text' &&   // Управлява се от handleStatusUpdate
-                !element.id.includes('-status-text') &&   // Управлява се от handleStatusUpdate
-                !element.id.includes('-module-id') &&     // Управлява се от handleStatusUpdate
-                !element.id.includes('-module-ids')) {    // Управлява се от handleStatusUpdate
+                element.id !== 'operator-name-display' &&
+                element.id !== 'overall-status-text' &&
+                !element.id.includes('-status-text') &&
+                !element.id.includes('-module-id') &&
+                !element.id.includes('-module-ids') &&
+                element.tagName !== 'TITLE') {
                 element.textContent = getTranslation(key);
+            } else if (element.tagName === 'TITLE') {
+                 document.title = getTranslation(key); // Заглавието на страницата
             }
         });
     }
 
     function handleStatusUpdate(lineData) {
         if (!lineData) return;
-        // console.log("Получен нов статус на линията:", lineData);
         if (overallStatusIndicator && overallStatusText && lineData.overall_status) {
             const statusClass = (lineData.overall_status.split('.')[1] || 'idle').toLowerCase();
             overallStatusIndicator.className = 'status-indicator ' + statusClass;
             overallStatusText.textContent = getTranslation(lineData.overall_status);
+            overallStatusText.setAttribute('data-translate-key', lineData.overall_status);
         }
         if (lineData.robots) {
             for (let i = 1; i <= 3; i++) {
@@ -96,37 +97,50 @@ document.addEventListener('DOMContentLoaded', function () {
                     const statusClass = (lineData.robots[i].status.split('.')[1] || 'idle').toLowerCase();
                     robotStatusIndicator.className = 'status-indicator ' + statusClass;
                     robotStatusText.textContent = getTranslation(lineData.robots[i].status);
+                    robotStatusText.setAttribute('data-translate-key', lineData.robots[i].status);
                 }
             }
         }
         if (lineData.turntable1) {
             for (let i = 1; i <= 4; i++) {
                 const moduleIdSpan = document.getElementById(`v1p${i}-module-id`);
-                if (moduleIdSpan && lineData.turntable1[i]) {
-                    moduleIdSpan.textContent = lineData.turntable1[i].moduleId || '--';
+                const statusTextSpan = document.getElementById(`v1p${i}-status-text`);
+                if (lineData.turntable1[i]) {
+                    if (moduleIdSpan) moduleIdSpan.textContent = lineData.turntable1[i].moduleId || '--';
+                    if (statusTextSpan) {
+                        statusTextSpan.textContent = getTranslation(lineData.turntable1[i].status || 'status.idle');
+                        statusTextSpan.setAttribute('data-translate-key', lineData.turntable1[i].status || 'status.idle');
+                    }
                 }
             }
         }
         if (lineData.turntable2) {
             for (let i = 1; i <= 4; i++) {
                 const moduleIdsSpan = document.getElementById(`v2p${i}-module-ids`);
-                if (moduleIdsSpan && lineData.turntable2[i]) {
-                    moduleIdsSpan.textContent = (lineData.turntable2[i].moduleIds || []).join(', ') || '--';
+                const statusTextSpan = document.getElementById(`v2p${i}-status-text`);
+                if (lineData.turntable2[i]) {
+                    if (moduleIdsSpan) moduleIdsSpan.textContent = (lineData.turntable2[i].moduleIds || []).join(', ') || '--';
+                    if (statusTextSpan) {
+                         statusTextSpan.textContent = getTranslation(lineData.turntable2[i].status || 'status.idle');
+                         statusTextSpan.setAttribute('data-translate-key', lineData.turntable2[i].status || 'status.idle');
+                    }
                 }
             }
         }
-        if (lineData.trays) {
+         if (lineData.trays) {
              const trayInIndicator = document.getElementById('tray-in-status-indicator');
              const trayInText = document.getElementById('tray-in-status-text');
              if(trayInIndicator && trayInText && lineData.trays.in && lineData.trays.in.status){
                 trayInIndicator.className = 'status-indicator ' + (lineData.trays.in.status.split('.')[1] || 'empty');
                 trayInText.textContent = getTranslation(lineData.trays.in.status);
+                trayInText.setAttribute('data-translate-key', lineData.trays.in.status);
              }
              const trayOutIndicator = document.getElementById('tray-out-status-indicator');
              const trayOutText = document.getElementById('tray-out-status-text');
              if(trayOutIndicator && trayOutText && lineData.trays.out && lineData.trays.out.status){
                 trayOutIndicator.className = 'status-indicator ' + (lineData.trays.out.status.split('.')[1] || 'empty');
                 trayOutText.textContent = getTranslation(lineData.trays.out.status);
+                trayOutText.setAttribute('data-translate-key', lineData.trays.out.status);
              }
         }
     }
@@ -145,52 +159,60 @@ document.addEventListener('DOMContentLoaded', function () {
             console.warn('Не са получени преводи в initial_data!');
         }
 
-        applyAllStaticTranslations(); // Превеждаме всички статични елементи веднъж
+        applyStaticTranslations();
 
         if (data.line_status) {
             console.log('Получен е line_status, прилагам го...');
-            handleStatusUpdate(data.line_status); // Показваме началния статус на машините
+            handleStatusUpdate(data.line_status);
         } else {
             console.warn('Не е получен line_status в initial_data!');
         }
-        updateUI(); // Показваме правилната начална задача
+        updateUI();
     });
 
     socket.on('update_status', handleStatusUpdate);
 
     socket.on('barcode_scanned', (data) => {
         const barcode = data.barcode;
-        addLogEntry(`Получен баркод: ${barcode}`); // Директно съобщение
+        addLogEntry(`log.barcodeReceived`, 'info', {barcodeData: barcode}); // Подаваме като ключ
         if (state.currentStep === 'awaiting_operator') {
             if(taskInstruction) taskInstruction.textContent = getTranslation('log.validatingOperator').replace('{badge_id}', barcode);
             socket.emit('validate_operator', { 'barcode': barcode });
         } else if (state.currentStep === 'awaiting_travel_lot') {
-            if(taskInstruction) taskInstruction.textContent = `Проверка на маршрутна карта: ${barcode}...`; // Директно съобщение
+            if(taskInstruction) taskInstruction.textContent = `Проверка на маршрутна карта: ${barcode}...`;
             socket.emit('validate_travel_lot', { 'barcode': barcode });
         }
     });
 
     socket.on('operator_validation_result', (data) => {
+        console.log('[JS] operator_validation_result:', data);
+        let scannedValue = 'N/A'; // За логване, ако data.operator_info е null
+        if (state.currentStep === 'awaiting_operator') { // Опитваме се да вземем сканирания баркод
+            try { // Добавяме try-catch, ако taskInstruction.textContent е неочакван
+                scannedValue = taskInstruction.textContent.split(': ')[1].replace('...','');
+            } catch(e) { console.warn("Не може да се извлече сканиран баркод от taskInstruction"); }
+        }
+
         if (data.is_valid && data.operator_info) {
             state.operator = data.operator_info;
             state.currentStep = 'awaiting_travel_lot';
-            addLogEntry(getTranslation('log.operatorLoggedIn').replace('{operator_name}', data.operator_info.name), 'success');
+            addLogEntry("log.operatorLoggedIn", 'success', {operator_name: data.operator_info.name});
         } else {
             state.operator = null;
             state.currentStep = 'awaiting_operator';
-            addLogEntry(getTranslation('log.operatorScanFailed').replace('{operator_id}', data.operator_info ? data.operator_info.id : 'N/A'), 'error');
+            addLogEntry("log.operatorScanFailed", 'error', {operator_id: data.operator_info ? data.operator_info.id : scannedValue});
         }
         updateUI();
     });
 
     socket.on('travel_lot_validation_result', (data) => {
+        console.log('[JS] travel_lot_validation_result:', data);
         if (data.is_valid && data.travel_lot_info) {
             state.travelLot = data.travel_lot_info;
             state.currentStep = 'ready';
-            addLogEntry(getTranslation('log.travelLotIdentified').replace('{lot_id}', data.travel_lot_info.id).replace('{item_number}', data.travel_lot_info.productNumber), 'success');
+            addLogEntry("log.travelLotIdentified", 'success', {lot_id: data.travel_lot_info.id, item_number: data.travel_lot_info.productNumber});
         } else {
-             addLogEntry(getTranslation('log.travelLotApiError').replace('{error}', data.error || 'Невалидна пътна карта'), 'error');
-             // При неуспех с пътната карта, оставаме на стъпка 'awaiting_travel_lot'
+             addLogEntry("log.travelLotApiError", 'error', {error: data.error || 'Невалидна пътна карта'});
         }
         updateUI();
     });
@@ -199,7 +221,7 @@ document.addEventListener('DOMContentLoaded', function () {
         addLogEntry(log.message, log.level);
     });
 
-    socket.on('disconnect', () => addLogEntry(getTranslation('socket.disconnected'), 'error'));
+    socket.on('disconnect', () => addLogEntry('socket.disconnected', 'error')); // Използваме ключ
 
     if (langSelect) {
         langSelect.addEventListener('change', function() {
@@ -208,7 +230,7 @@ document.addEventListener('DOMContentLoaded', function () {
     }
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
-            addLogEntry(getTranslation('log.operatorLoggedOut'), 'info');
+            addLogEntry('log.operatorLoggedOut', 'info');
             socket.emit('logout_request');
         });
     }

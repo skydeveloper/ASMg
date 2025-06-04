@@ -110,6 +110,10 @@
         "testResultReceived": "Получен резултат от тест от {device}: Задача {task}, Резултат {result}",
         "simulation": "Симулация: {message}",
         "operatorLoginRequired": "Изисква се вход на оператор!",
-        "travelLotScanRequired": "Сканирайте маршрутна карта!"
+        "travelLotScanRequired": "Сканирайте маршрутна карта!",
+        "travelLotApiError": "Грешка при обработка на пътна карта: {error}"
+    },
+    "error": {
+        "missingTestData": "Липсват данни за стартиране на тест/задача към устройство."
     }
 }

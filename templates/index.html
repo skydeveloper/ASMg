@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>{{ translations['appTitle'] or 'ASMg Interface' }}</title>
+    <title>{{ translations.get('appTitle', 'ASMg Interface') }}</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
 </head>
@@ -22,7 +22,7 @@
                 </select>
                 <div class="flex items-center bg-gray-700 px-4 py-2 rounded-lg">
                     <span id="overall-status-indicator" class="status-indicator {{ initial_data.get('overall_status', 'status.idle').split('.')[1] if initial_data else 'idle' }}"></span>
-                    <span id="overall-status-text" class="font-semibold" data-translate-key="{{ initial_data.get('overall_status', 'status.idle') }}">{{ translations.get(initial_data.get('overall_status', 'status.idle'), 'Idle') }}</span>
+                    <span id="overall-status-text" class="font-semibold" data-translate-key="{{ initial_data.get('overall_status', 'status.idle') }}">{{ translations.get(initial_data.get('overall_status', 'status.idle'), 'Idle') if initial_data else translations.get('status.idle', 'Idle') }}</span>
                 </div>
             </div>
         </header>
@@ -52,10 +52,11 @@
                     <h3 class="text-xl font-semibold mb-4" data-translate-key="robotsSection.title"></h3>
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-4">
                         {% for i in range(1, 4) %}
-                        {% set robot = initial_data.get('robots', {}).get(i|string, {}) %}
+                        {% set robot_i = i|string %}
+                        {% set robot_data = initial_data.get('robots', {}).get(robot_i, {}) %}
                         <div class="flex items-center bg-gray-600 p-3 rounded-lg">
-                            <span id="robot{{i}}-status-indicator" class="status-indicator {{ robot.get('status', 'status.idle').split('.')[1] }}"></span>
-                            <span class="font-medium" data-translate-key="robotsSection.robot{{i}}"></span>: <span id="robot{{i}}-status-text" data-translate-key="{{ robot.get('status', 'status.idle') }}"></span>
+                            <span id="robot{{i}}-status-indicator" class="status-indicator {{ robot_data.get('status', 'status.idle').split('.')[1] }}"></span>
+                            <span class="font-medium" data-translate-key="robotsSection.robot{{i}}"></span>: <span id="robot{{i}}-status-text" data-translate-key="{{ robot_data.get('status', 'status.idle') }}"></span>
                         </div>
                         {% endfor %}
                     </div>
@@ -64,20 +65,24 @@
                     <div class="bg-gray-700 p-5 rounded-lg">
                         <h3 class="text-xl font-semibold mb-4" data-translate-key="turntable1.title"></h3>
                         {% for i in range(1, 5) %}
-                        {% set tt1_pos = initial_data.get('turntable1', {}).get(i|string, {}) %}
+                        {% set tt1_pos_i = i|string %}
+                        {% set tt1_pos_data = initial_data.get('turntable1', {}).get(tt1_pos_i, {}) %}
                         <div class="bg-gray-600 p-3 rounded-lg mb-2">
                             <h4 class="font-semibold" data-translate-key="turntable1.position{{i}}"></h4>
-                            <p><span data-translate-key="turntable.moduleIdLabel"></span>: <span id="v1p{{i}}-module-id">{{ tt1_pos.get('moduleId', '--') }}</span></p>
+                            <p><span data-translate-key="turntable.moduleIdLabel"></span>: <span id="v1p{{i}}-module-id">{{ tt1_pos_data.get('moduleId', '--') }}</span></p>
+                            <p><span data-translate-key="turntable.statusLabel"></span>: <span id="v1p{{i}}-status-text" data-translate-key="{{ tt1_pos_data.get('status', 'status.idle')}}"></span></p>
                         </div>
                         {% endfor %}
                     </div>
                     <div class="bg-gray-700 p-5 rounded-lg">
                         <h3 class="text-xl font-semibold mb-4" data-translate-key="turntable2.title"></h3>
                         {% for i in range(1, 5) %}
-                        {% set tt2_pos = initial_data.get('turntable2', {}).get(i|string, {}) %}
+                        {% set tt2_pos_i = i|string %}
+                        {% set tt2_pos_data = initial_data.get('turntable2', {}).get(tt2_pos_i, {}) %}
                          <div class="bg-gray-600 p-3 rounded-lg mb-2">
                             <h4 class="font-semibold" data-translate-key="turntable2.position{{i}}"></h4>
-                            <p><span data-translate-key="turntable.modulesLabel"></span>: <span id="v2p{{i}}-module-ids">{{ (tt2_pos.get('moduleIds', []) | join(', ')) if tt2_pos.get('moduleIds') else '--' }}</span></p>
+                            <p><span data-translate-key="turntable.modulesLabel"></span>: <span id="v2p{{i}}-module-ids">{{ (tt2_pos_data.get('moduleIds', []) | join(', ')) if tt2_pos_data.get('moduleIds') else '--' }}</span></p>
+                            <p><span data-translate-key="turntable.statusLabel"></span>: <span id="v2p{{i}}-status-text" data-translate-key="{{ tt2_pos_data.get('status', 'status.idle')}}"></span></p>
                         </div>
                         {% endfor %}
                     </div>
@@ -85,15 +90,15 @@
                  <div class="bg-gray-700 p-5 rounded-lg">
                     <h3 class="text-xl font-semibold mb-4" data-translate-key="traysSection.title"></h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        {% set tray_in = initial_data.get('trays', {}).get('in', {}) %}
-                        {% set tray_out = initial_data.get('trays', {}).get('out', {}) %}
+                        {% set tray_in_data = initial_data.get('trays', {}).get('in', {}) %}
+                        {% set tray_out_data = initial_data.get('trays', {}).get('out', {}) %}
                         <div class="flex items-center bg-gray-600 p-3 rounded-lg">
-                            <span id="tray-in-status-indicator" class="status-indicator {{ tray_in.get('status', 'status.empty').split('.')[1] }}"></span>
-                            <span data-translate-key="traysSection.inTray"></span>: <span id="tray-in-status-text" data-translate-key="{{ tray_in.get('status', 'status.empty') }}"></span>
+                            <span id="tray-in-status-indicator" class="status-indicator {{ tray_in_data.get('status', 'status.empty').split('.')[1] }}"></span>
+                            <span data-translate-key="traysSection.inTray"></span>: <span id="tray-in-status-text" data-translate-key="{{ tray_in_data.get('status', 'status.empty') }}"></span>
                         </div>
                         <div class="flex items-center bg-gray-600 p-3 rounded-lg">
-                            <span id="tray-out-status-indicator" class="status-indicator {{ tray_out.get('status', 'status.empty').split('.')[1] }}"></span>
-                            <span data-translate-key="traysSection.outTray"></span>: <span id="tray-out-status-text" data-translate-key="{{ tray_out.get('status', 'status.empty') }}"></span>
+                            <span id="tray-out-status-indicator" class="status-indicator {{ tray_out_data.get('status', 'status.empty').split('.')[1] }}"></span>
+                            <span data-translate-key="traysSection.outTray"></span>: <span id="tray-out-status-text" data-translate-key="{{ tray_out_data.get('status', 'status.empty') }}"></span>
                         </div>
                     </div>
                 </div>
