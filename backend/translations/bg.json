@@ -39,9 +39,7 @@
         "itemNumberLabel": "Номер на Изделие:",
         "itemDescriptionLabel": "Описание:",
         "orderNumberLabel": "Номер на Поръчка:",
-        "quantityLabel": "Количество:",
-        "loadButton": "Зареди",
-        "clearButton": "Изчисти"
+        "quantityLabel": "Количество:"
     },
     "lineStatusSection": {
         "title": "Статус на Линията"
@@ -69,8 +67,7 @@
     "turntable": {
         "statusLabel": "Статус:",
         "moduleIdLabel": "ID на Модул:",
-        "modulesLabel": "Модули:",
-        "timeLabel": "Време:"
+        "modulesLabel": "Модули:"
     },
     "traysSection": {
         "title": "Тави",
@@ -79,6 +76,15 @@
     },
     "logSection": {
         "title": "Системни Съобщения"
+    },
+    "simulationSection": {
+        "title": "Симулации",
+        "deviceId": "ID на симулирано устройство:",
+        "message": "Съобщение за симулация:",
+        "sendSuccessReport": "Изпрати успешен доклад",
+        "sendFailReport": "Изпрати неуспешен доклад",
+        "simulateRobotError": "Симулирай грешка в Робот 1",
+        "simulateTurntableModule": "Симулирай модул на Въртележка 2"
     },
     "socket": {
         "connected": "Успешно свързване със сървъра."
@@ -97,6 +103,13 @@
         "travelCardCleared": "Данните за пътната карта са изчистени.",
         "simulatorInitialized": "Симулаторът на данни е инициализиран.",
         "simulatorStarted": "Симулаторът на данни е стартиран.",
-        "simulatorStopping": "Симулаторът на данни спира."
+        "simulatorStopping": "Симулаторът на данни спира.",
+        "initiatingTest": "Стартиране на тест '{test_name}' на устройство {device_ip}...",
+        "testInitiatedSuccess": "Тест '{test_name}' успешно стартиран. ID на задача: {task_id}",
+        "testInitiatedFail": "Неуспешно стартиране на тест '{test_name}' на устройство {device_ip}.",
+        "testResultReceived": "Получен резултат от тест от {device}: Задача {task}, Резултат {result}",
+        "simulation": "Симулация: {message}",
+        "operatorLoginRequired": "Изисква се вход на оператор!",
+        "travelLotScanRequired": "Сканирайте маршрутна карта!"
     }
 }

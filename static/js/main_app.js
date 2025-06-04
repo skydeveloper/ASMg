@@ -14,11 +14,6 @@ document.addEventListener('DOMContentLoaded', function () {
     const overallStatusIndicator = document.getElementById('overall-status-indicator');
     const overallStatusText = document.getElementById('overall-status-text');
 
-    // При другите декларации на елементи
-    const moduleActionsPanel = document.getElementById('module-actions-panel');
-    const actionModuleIdSpan = document.getElementById('action-module-id');
-    const btnStartTestTester1 = document.getElementById('btn-start-test-tester1');
-
     let state = {
         currentStep: 'awaiting_operator',
         operator: null,
@@ -27,7 +22,7 @@ document.addEventListener('DOMContentLoaded', function () {
     };
 
     function getTranslation(key) {
-        if (!key || typeof key !== 'string') return '';
+        if (!key || typeof key !== 'string') return key || '';
         const keys = key.split('.');
         let result = state.translations;
         for (const k of keys) {
@@ -37,67 +32,102 @@ document.addEventListener('DOMContentLoaded', function () {
                 return key;
             }
         }
-        return result;
+        return typeof result === 'string' ? result : key;
     }
 
     function updateUI() {
         console.log(`[UI] Обновяване на UI. Текуща стъпка: ${state.currentStep}`);
-        if (taskTitle && taskInstruction) {
-            switch (state.currentStep) {
-                case 'awaiting_operator':
-                    taskTitle.textContent = getTranslation('task.scanOperator');
-                    taskInstruction.textContent = getTranslation('task.waitingForScan');
-                    break;
-                case 'awaiting_travel_lot':
-                    taskTitle.textContent = getTranslation('task.scanTravelLot');
-                    taskInstruction.innerHTML = `${getTranslation('task.operatorIdentified')}: <strong>${state.operator.name}</strong>. ${getTranslation('task.scanTravelLotPrompt')}`;
-                    break;
-                case 'ready':
-                    taskTitle.textContent = getTranslation('task.ready');
-                    taskInstruction.textContent = getTranslation('task.systemReadyPrompt');
-                    break;
-            }
+        if (taskTitle) taskTitle.textContent = getTranslation(state.currentStep === 'awaiting_operator' ? 'task.scanOperator' : state.currentStep === 'awaiting_travel_lot' ? 'task.scanTravelLot' : 'task.ready');
+        if (taskInstruction) {
+            if (state.currentStep === 'awaiting_operator') taskInstruction.textContent = getTranslation('task.waitingForScan');
+            else if (state.currentStep === 'awaiting_travel_lot' && state.operator) taskInstruction.innerHTML = `${getTranslation('task.operatorIdentified')}: <strong>${state.operator.name}</strong>. ${getTranslation('task.scanTravelLotPrompt')}`;
+            else if (state.currentStep === 'ready') taskInstruction.textContent = getTranslation('task.systemReadyPrompt');
         }
-        if(operatorIdDisplay && operatorNameDisplay) {
-            operatorIdDisplay.textContent = state.operator ? state.operator.id : '--';
-            operatorNameDisplay.textContent = state.operator ? state.operator.name : getTranslation('operatorSection.nameDefault');
-        }
-        if(travelLotIdDisplay && productNumberDisplay) {
-            travelLotIdDisplay.textContent = state.travelLot ? state.travelLot.id : '--';
-            productNumberDisplay.textContent = state.travelLot ? state.travelLot.productNumber : '--';
-        }
-        if(logoutBtn) {
-            logoutBtn.style.display = state.operator ? 'block' : 'none';
-        }
+        if (operatorIdDisplay) operatorIdDisplay.textContent = state.operator ? state.operator.id : '--';
+        if (operatorNameDisplay) operatorNameDisplay.textContent = state.operator ? state.operator.name : getTranslation('operatorSection.nameDefault');
+        if (travelLotIdDisplay) travelLotIdDisplay.textContent = state.travelLot ? state.travelLot.id : '--';
+        if (productNumberDisplay) productNumberDisplay.textContent = state.travelLot ? state.travelLot.productNumber : '--';
+        if (logoutBtn) logoutBtn.style.display = state.operator ? 'block' : 'none';
     }
 
     function addLogEntry(message, level = 'info') {
         if (!logPanel) return;
-        const translatedMessage = getTranslation(message);
+        let displayMessage = message;
+        // Опитваме да преведем, само ако съобщението не съдържа вече форматирани данни (рядко, но за всеки случай)
+        if (message && !message.includes('{') && !message.includes('}')) {
+            displayMessage = getTranslation(message);
+        }
         const entryDiv = document.createElement('div');
         entryDiv.classList.add('log-entry', `log-${level}`);
         const timestamp = new Date().toLocaleTimeString('bg-BG');
-        entryDiv.innerHTML = `<span class="text-gray-500 mr-2">${timestamp}</span> &raquo; <span class="ml-1">${translatedMessage}</span>`;
+        entryDiv.innerHTML = `<span class="text-gray-500 mr-2">${timestamp}</span> &raquo; <span class="ml-1">${displayMessage}</span>`;
         logPanel.insertBefore(entryDiv, logPanel.firstChild);
     }
 
-    function handleStatusUpdate(data) {
-        if (!data) return;
-        if (overallStatusIndicator && overallStatusText && data.overall_status) {
-            const statusKey = data.overall_status.split('.')[1] || 'idle';
-            overallStatusIndicator.className = 'status-indicator ' + statusKey;
-            overallStatusText.textContent = getTranslation(data.overall_status);
+    function applyAllStaticTranslations() {
+        document.querySelectorAll('[data-translate-key]').forEach(element => {
+            const key = element.getAttribute('data-translate-key');
+            // Превеждаме само елементи, които не се управляват директно от updateUI или handleStatusUpdate за динамични стойности
+            if (element.id !== 'task-title' &&
+                element.id !== 'task-instruction' &&
+                element.id !== 'operator-name-display' && // Управлява се от updateUI
+                element.id !== 'overall-status-text' &&   // Управлява се от handleStatusUpdate
+                !element.id.includes('-status-text') &&   // Управлява се от handleStatusUpdate
+                !element.id.includes('-module-id') &&     // Управлява се от handleStatusUpdate
+                !element.id.includes('-module-ids')) {    // Управлява се от handleStatusUpdate
+                element.textContent = getTranslation(key);
+            }
+        });
+    }
+
+    function handleStatusUpdate(lineData) {
+        if (!lineData) return;
+        // console.log("Получен нов статус на линията:", lineData);
+        if (overallStatusIndicator && overallStatusText && lineData.overall_status) {
+            const statusClass = (lineData.overall_status.split('.')[1] || 'idle').toLowerCase();
+            overallStatusIndicator.className = 'status-indicator ' + statusClass;
+            overallStatusText.textContent = getTranslation(lineData.overall_status);
         }
-        if (data.robots) {
+        if (lineData.robots) {
             for (let i = 1; i <= 3; i++) {
-                const robotStatusText = document.getElementById(`robot${i}-status-text`);
                 const robotStatusIndicator = document.getElementById(`robot${i}-status-indicator`);
-                if (robotStatusText && robotStatusIndicator && data.robots[i] && data.robots[i].status) {
-                    const robotStatusKey = data.robots[i].status.split('.')[1] || 'idle';
-                    robotStatusIndicator.className = 'status-indicator ' + robotStatusKey;
-                    robotStatusText.textContent = getTranslation(data.robots[i].status);
+                const robotStatusText = document.getElementById(`robot${i}-status-text`);
+                if (robotStatusIndicator && robotStatusText && lineData.robots[i] && lineData.robots[i].status) {
+                    const statusClass = (lineData.robots[i].status.split('.')[1] || 'idle').toLowerCase();
+                    robotStatusIndicator.className = 'status-indicator ' + statusClass;
+                    robotStatusText.textContent = getTranslation(lineData.robots[i].status);
                 }
             }
+        }
+        if (lineData.turntable1) {
+            for (let i = 1; i <= 4; i++) {
+                const moduleIdSpan = document.getElementById(`v1p${i}-module-id`);
+                if (moduleIdSpan && lineData.turntable1[i]) {
+                    moduleIdSpan.textContent = lineData.turntable1[i].moduleId || '--';
+                }
+            }
+        }
+        if (lineData.turntable2) {
+            for (let i = 1; i <= 4; i++) {
+                const moduleIdsSpan = document.getElementById(`v2p${i}-module-ids`);
+                if (moduleIdsSpan && lineData.turntable2[i]) {
+                    moduleIdsSpan.textContent = (lineData.turntable2[i].moduleIds || []).join(', ') || '--';
+                }
+            }
+        }
+        if (lineData.trays) {
+             const trayInIndicator = document.getElementById('tray-in-status-indicator');
+             const trayInText = document.getElementById('tray-in-status-text');
+             if(trayInIndicator && trayInText && lineData.trays.in && lineData.trays.in.status){
+                trayInIndicator.className = 'status-indicator ' + (lineData.trays.in.status.split('.')[1] || 'empty');
+                trayInText.textContent = getTranslation(lineData.trays.in.status);
+             }
+             const trayOutIndicator = document.getElementById('tray-out-status-indicator');
+             const trayOutText = document.getElementById('tray-out-status-text');
+             if(trayOutIndicator && trayOutText && lineData.trays.out && lineData.trays.out.status){
+                trayOutIndicator.className = 'status-indicator ' + (lineData.trays.out.status.split('.')[1] || 'empty');
+                trayOutText.textContent = getTranslation(lineData.trays.out.status);
+             }
         }
     }
 
@@ -107,120 +137,75 @@ document.addEventListener('DOMContentLoaded', function () {
     });
 
     socket.on('initial_data', (data) => {
-        console.log('Получени начални данни.');
+        console.log('Получени начални данни от сървъра:', data);
         if (data.translations) {
             state.translations = data.translations;
+            console.log('Преводите са заредени в state.translations.');
+        } else {
+            console.warn('Не са получени преводи в initial_data!');
         }
-        document.querySelectorAll('[data-translate-key]').forEach(element => {
-            element.textContent = getTranslation(element.getAttribute('data-translate-key'));
-        });
+
+        applyAllStaticTranslations(); // Превеждаме всички статични елементи веднъж
+
         if (data.line_status) {
-            handleStatusUpdate(data.line_status);
+            console.log('Получен е line_status, прилагам го...');
+            handleStatusUpdate(data.line_status); // Показваме началния статус на машините
+        } else {
+            console.warn('Не е получен line_status в initial_data!');
         }
-        updateUI();
+        updateUI(); // Показваме правилната начална задача
     });
 
     socket.on('update_status', handleStatusUpdate);
 
     socket.on('barcode_scanned', (data) => {
         const barcode = data.barcode;
-        addLogEntry(`Получен баркод: ${barcode}`);
+        addLogEntry(`Получен баркод: ${barcode}`); // Директно съобщение
         if (state.currentStep === 'awaiting_operator') {
-            taskInstruction.textContent = `${getTranslation('log.validatingOperator').replace('{badge_id}', barcode)}...`;
+            if(taskInstruction) taskInstruction.textContent = getTranslation('log.validatingOperator').replace('{badge_id}', barcode);
             socket.emit('validate_operator', { 'barcode': barcode });
         } else if (state.currentStep === 'awaiting_travel_lot') {
-            taskInstruction.textContent = `Проверка на маршрутна карта: ${barcode}...`;
+            if(taskInstruction) taskInstruction.textContent = `Проверка на маршрутна карта: ${barcode}...`; // Директно съобщение
             socket.emit('validate_travel_lot', { 'barcode': barcode });
         }
     });
 
     socket.on('operator_validation_result', (data) => {
-        if (data.is_valid) {
-            addLogEntry(getTranslation('log.operatorLoggedIn').replace('{operator_name}', data.operator_info.name), 'success');
+        if (data.is_valid && data.operator_info) {
             state.operator = data.operator_info;
             state.currentStep = 'awaiting_travel_lot';
+            addLogEntry(getTranslation('log.operatorLoggedIn').replace('{operator_name}', data.operator_info.name), 'success');
         } else {
-            addLogEntry('Сканираният бадж не е валиден!', 'error');
             state.operator = null;
             state.currentStep = 'awaiting_operator';
+            addLogEntry(getTranslation('log.operatorScanFailed').replace('{operator_id}', data.operator_info ? data.operator_info.id : 'N/A'), 'error');
         }
         updateUI();
     });
 
     socket.on('travel_lot_validation_result', (data) => {
-        if (data.is_valid) {
-            let message = getTranslation('log.travelLotIdentified').replace('{lot_id}', data.travel_lot_info.id).replace('{item_number}', data.travel_lot_info.productNumber);
-            addLogEntry(message, 'success');
+        if (data.is_valid && data.travel_lot_info) {
             state.travelLot = data.travel_lot_info;
             state.currentStep = 'ready';
+            addLogEntry(getTranslation('log.travelLotIdentified').replace('{lot_id}', data.travel_lot_info.id).replace('{item_number}', data.travel_lot_info.productNumber), 'success');
         } else {
-            addLogEntry('Сканираната маршрутна карта не е валидна!', 'error');
+             addLogEntry(getTranslation('log.travelLotApiError').replace('{error}', data.error || 'Невалидна пътна карта'), 'error');
+             // При неуспех с пътната карта, оставаме на стъпка 'awaiting_travel_lot'
         }
         updateUI();
     });
 
-
-    // Функция, която да показва панела с действия за даден модул
-    function showModuleActions(moduleId) {
-        if (moduleActionsPanel && actionModuleIdSpan) {
-            actionModuleIdSpan.textContent = moduleId;
-            moduleActionsPanel.style.display = 'block';
-            // Тук може да зададете и IP адреса на тестера, ако е динамичен
-            // localStorage.setItem('currentModuleForAction', moduleId);
-        }
-    }
-
-    if (btnStartTestTester1) {
-        btnStartTestTester1.addEventListener('click', () => {
-            const moduleId = actionModuleIdSpan.textContent; // Вземаме ID-то на модула
-            if (!moduleId || moduleId === '--') {
-                addLogEntry('Моля, първо изберете/сканирайте модул.', 'warning');
-                return;
-            }
-
-            // Примерни данни - IP адресът и портът на Тестер 1 трябва да са конфигурируеми
-            // Може да ги вземете от Config файла чрез initial_data, или да ги имате в JS
-            const tester1_ip = "192.168.1.101"; // ЗАМЕНЕТЕ С РЕАЛНИЯ IP
-            const tester1_port = 8000;          // ЗАМЕНЕТЕ С РЕАЛНИЯ ПОРТ
-            const test_name = "full_functional_test"; // Примерно име на тест
-
-            console.log(`[JS] Изпращане на команда за старт на тест към Тестер 1 за модул: ${moduleId}`);
-            socket.emit('trigger_start_test_on_device', {
-                module_id: moduleId,
-                device_ip: tester1_ip,
-                device_port: tester1_port,
-                test_name: test_name
-            });
-        });
-    }
-
-    // Трябва да имате и хендлър за 'test_initiation_result' и 'ui_notification'
-    socket.on('test_initiation_result', (data) => {
-        if (data.success) {
-            addLogEntry(data.message, 'success');
-        } else {
-            addLogEntry(data.message, 'error');
-        }
-    });
-
-    socket.on('ui_notification', (data) => {
-        addLogEntry(data.message, data.level);
-    });
-
-    socket.on('log_message', (log) => {
+    socket.on('log_message', (log) => { // Тези съобщения идват вече преведени от сървъра
         addLogEntry(log.message, log.level);
     });
 
-    socket.on('disconnect', () => {
-        addLogEntry('Връзката със сървъра е прекъсната!', 'error');
-    });
+    socket.on('disconnect', () => addLogEntry(getTranslation('socket.disconnected'), 'error'));
 
     if (langSelect) {
         langSelect.addEventListener('change', function() {
             window.location.href = `/set_language/${this.value}`;
         });
     }
-
     if (logoutBtn) {
         logoutBtn.addEventListener('click', () => {
             addLogEntry(getTranslation('log.operatorLoggedOut'), 'info');
