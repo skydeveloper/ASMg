@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="{{ current_lang }}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{{ translations.get('testInterface.title', 'ASMg - Тестов Интерфейс') }}</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <link rel="stylesheet" href="{{ url_for('static', filename='css/style.css') }}">
+</head>
+<body class="bg-gray-800 text-gray-200 p-10">
+    <div class="container mx-auto max-w-3xl bg-gray-700 p-8 rounded-lg shadow-xl">
+        <h1 class="text-3xl font-bold text-white mb-6" data-translate-key="testInterface.header">{{ translations.get('testInterface.header', 'Тестов Интерфейс за Device Clients') }}</h1>
+
+        <div class="mb-8 p-6 bg-gray-600 rounded-lg">
+            <h2 class="text-xl font-semibold text-white mb-4" data-translate-key="testInterface.sendCommandTitle">{{ translations.get('testInterface.sendCommandTitle', 'Изпрати команда към Device Client') }}</h2>
+
+            <div class="grid grid-cols-1 md:grid-cols-2 gap-4 mb-4">
+                <div>
+                    <label for="device_ip" class="block text-sm font-medium text-gray-300" data-translate-key="testInterface.deviceIp">{{ translations.get('testInterface.deviceIp', 'IP на Устройство:') }}</label>
+                    <input type="text" id="device_ip" value="localhost" class="mt-1 block w-full bg-gray-500 border-gray-400 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-white">
+                </div>
+                <div>
+                    <label for="device_port" class="block text-sm font-medium text-gray-300" data-translate-key="testInterface.devicePort">{{ translations.get('testInterface.devicePort', 'Порт на Устройство:') }}</label>
+                    <input type="text" id="device_port" value="8001" class="mt-1 block w-full bg-gray-500 border-gray-400 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-white">
+                </div>
+            </div>
+
+            <div class="mb-4">
+                <label for="item_name_command" class="block text-sm font-medium text-gray-300" data-translate-key="testInterface.itemName">{{ translations.get('testInterface.itemName', 'Име/ID на Изделие (за DeviceClient):') }}</label>
+                <input type="text" id="item_name_command" value="TEST_ITEM_001" class="mt-1 block w-full bg-gray-500 border-gray-400 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-white">
+            </div>
+            <div class="mb-4">
+                <label for="task_details_command" class="block text-sm font-medium text-gray-300" data-translate-key="testInterface.taskDetails">{{ translations.get('testInterface.taskDetails', 'Детайли за Задачата/Фърмуер:') }}</label>
+                <input type="text" id="task_details_command" value="firmware_v1.2.3.hex" class="mt-1 block w-full bg-gray-500 border-gray-400 rounded-md shadow-sm py-2 px-3 focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm text-white">
+            </div>
+
+            <div class="mb-4">
+                <p class="block text-sm font-medium text-gray-300" data-translate-key="testInterface.serialNumbersTitle">{{translations.get('testInterface.serialNumbersTitle', 'Серийни номера (до 4):')}}</p>
+                {% for i in range(4) %}
+                <div class="grid grid-cols-1 md:grid-cols-2 gap-2 items-center mt-1">
+                    <input type="text" id="serial_num_command_{{ i+1 }}" placeholder="Сериен № за гнездо {{ i+1 }}" class="bg-gray-500 border-gray-400 rounded-md py-1 px-2 text-sm text-white">
+                    <div>
+                        <input type="checkbox" id="slot_active_command_{{ i+1 }}" class="form-checkbox h-5 w-5 text-indigo-600">
+                        <label for="slot_active_command_{{ i+1 }}" class="ml-2 text-sm text-gray-300" data-translate-key="testInterface.slotActive">{{translations.get('testInterface.slotActive', 'Гнездо активно')}}</label>
+                    </div>
+                </div>
+                {% endfor %}
+            </div>
+
+            <button id="btn_trigger_start_task_dc" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg" data-translate-key="testInterface.sendStartCommand">{{ translations.get('testInterface.sendStartCommand', 'Изпрати "Старт Задача" към Device Client') }}</button>
+        </div>
+
+        <div class="mt-6">
+            <h2 class="text-xl font-semibold text-white mb-2" data-translate-key="testInterface.logTitle">{{ translations.get('testInterface.logTitle', 'Лог на Тестовия Интерфейс:') }}</h2>
+            <div id="test-interface-log" class="bg-gray-800 p-4 rounded-lg h-40 overflow-y-auto text-sm font-mono border border-gray-600">
+                <p data-translate-key="testInterface.logWaiting">{{ translations.get('testInterface.logWaiting', 'Очаквам събития...') }}</p>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/socket.io/4.7.5/socket.io.min.js"></script>
+    <script>
+        const socket = io(window.location.origin);
+        const testLogPanel = document.getElementById('test-interface-log');
+        const btnTriggerStartTaskDc = document.getElementById('btn_trigger_start_task_dc');
+
+        function addTestLog(message, type = 'info') {
+            const p = document.createElement('p');
+            p.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+            if (type === 'error') p.style.color = '#f87171'; // Tailwind red-400
+            if (type === 'success') p.style.color = '#34d399'; // Tailwind green-400
+            // Премахваме първото "Очаквам събития...", ако съществува
+            if (testLogPanel.childElementCount === 1 && testLogPanel.firstChild.getAttribute('data-translate-key') === 'testInterface.logWaiting') {
+                testLogPanel.innerHTML = '';
+            }
+            testLogPanel.appendChild(p);
+            testLogPanel.scrollTop = testLogPanel.scrollHeight;
+        }
+
+        if (btnTriggerStartTaskDc) {
+            btnTriggerStartTaskDc.addEventListener('click', () => {
+                const deviceIp = document.getElementById('device_ip').value || 'localhost';
+                const devicePort = parseInt(document.getElementById('device_port').value) || 8001;
+                const itemName = document.getElementById('item_name_command').value;
+                const taskDetails = document.getElementById('task_details_command').value;
+
+                const serialNumbers = [];
+                const activeSlots = [];
+                for (let i = 1; i <= 4; i++) {
+                    serialNumbers.push(document.getElementById(`serial_num_command_${i}`).value);
+                    activeSlots.push(document.getElementById(`slot_active_command_${i}`).checked);
+                }
+
+                const commandData = {
+                    device_ip: deviceIp,
+                    device_port: devicePort,
+                    item_name: itemName,       // За DeviceClientApp, който очаква item_name
+                    module_id: itemName,       // За съвместимост, ако някъде се ползва module_id
+                    task_details: taskDetails, // За DeviceClientApp, който очаква firmware_details
+                    serial_numbers: serialNumbers,
+                    active_slots: activeSlots
+                };
+
+                addTestLog(`Изпращане на команда 'trigger_task_on_device_client' към ASMg: ${JSON.stringify(commandData)}`);
+                socket.emit('trigger_task_on_device_client', commandData);
+            });
+        }
+
+        socket.on('test_initiation_result', (data) => {
+            addTestLog(`Резултат от иницииране на задача: ${JSON.stringify(data)}`, data.success ? 'success' : 'error');
+        });
+
+        socket.on('ui_notification', (data) => {
+             addTestLog(`ASMg UI Бележка: ${data.message} (Ниво: ${data.level})`, data.level);
+        });
+
+        // Превеждаме статичните елементи при зареждане
+        const initialTranslations = {{ translations|tojson }};
+        document.querySelectorAll('[data-translate-key]').forEach(element => {
+            const key = element.getAttribute('data-translate-key');
+            let text = key;
+            if (initialTranslations) {
+                const keys = key.split('.');
+                let current = initialTranslations;
+                for(const k of keys) {
+                    if (current && typeof current === 'object' && k in current) {
+                        current = current[k];
+                    } else {
+                        current = key;
+                        break;
+                    }
+                }
+                text = (typeof current === 'string') ? current : key;
+            }
+            // За бутони и заглавия сменяме textContent, за input полета - placeholder, ако е зададен
+            if (element.tagName === 'INPUT' && element.hasAttribute('placeholder')) {
+                if (text !== key) element.placeholder = text; // Сменяме placeholder само ако има превод
+            } else {
+                 element.textContent = text;
+            }
+        });
+        addTestLog("Тестовият интерфейс е зареден.");
+    </script>
+</body>
+</html>

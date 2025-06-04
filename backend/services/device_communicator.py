@@ -76,3 +76,13 @@ class DeviceCommunicator:
         """
         url = f"http://{device_ip}:{device_port}/api/status"  # Примерно URL
         return self._send_request('GET', url)
+
+    def send_task_to_device_client(self, device_ip, device_port, task_payload):
+        """
+        Изпраща обща задача към /api/start_task ендпойнта на DeviceClientApp.
+        task_payload трябва да съдържа ключовете, които DeviceClientApp очаква,
+        например: module_serial_numbers, active_slots, item_name, firmware_details
+        """
+        url = f"http://{device_ip}:{device_port}/api/start_task"
+        logger.info(f"DeviceCommunicator: Изпращане на задача към {url} с payload: {task_payload}")
+        return self._send_request('POST', url, payload=task_payload)

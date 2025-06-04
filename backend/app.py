@@ -289,4 +289,79 @@ def handle_trigger_start_test(data):
         emit('test_initiation_result', {'success': False, 'message': f"Неуспешно стартиране на тест '{test_name}'"})
 
 
+# Добавете този код в backend/app.py (ако вече го нямате)
+# или го редактирайте, за да подава правилните преводи
+
+@app.route('/test_device_interface')
+def test_device_interface_page():
+    lang_code = session.get('language', Config.DEFAULT_LANGUAGE)
+    # Взимаме основните преводи
+    current_translations = translation_data.get(lang_code, translation_data.get(Config.DEFAULT_LANGUAGE, {}))
+
+    # Дефинираме ключове, специфични за тестовата страница, ако ги няма в основните файлове
+    # (по-добре е да са в JSON файловете за пълнота)
+    test_interface_specific_keys = {
+        "testInterface.title": "ASMg - Тестов Интерфейс за Устройства",
+        "testInterface.header": "Тестов Интерфейс за Device Clients",
+        "testInterface.sendCommandTitle": "Изпрати команда към Device Client",
+        "testInterface.deviceIp": "IP на Устройство:",
+        "testInterface.devicePort": "Порт на Устройство:",
+        "testInterface.itemName": "Име/ID на Изделие (за DeviceClient):",
+        "testInterface.taskDetails": "Детайли за Задачата/Фърмуер:",
+        "testInterface.serialNumbersTitle": "Серийни номера (до 4):",
+        "testInterface.slotActive": "Гнездо активно",
+        "testInterface.sendStartCommand": "Изпрати Команда към Device Client (чрез ASMg)",
+        "testInterface.logTitle": "Лог на Тестовия Интерфейс:",
+        "testInterface.logWaiting": "Очаквам събития..."
+    }
+
+    # Обединяваме ги, като тези от файла translations_data имат предимство, ако съществуват
+    final_translations_for_test_page = {**test_interface_specific_keys, **current_translations}
+
+    return render_template('test_interface.html',
+                           translations=final_translations_for_test_page,
+                           current_lang=lang_code,
+                           supported_languages=Config.SUPPORTED_LANGUAGES)
+
+
+# В backend/app.py
+@socketio.on('trigger_task_on_device_client')  # Променено име на събитието, за да съвпада с JS
+def handle_trigger_task_on_device_client(data):
+    logger.info(f"ASMg: Получена UI заявка за стартиране на задача на DeviceClient: {data}")
+
+    device_ip = data.get('device_ip')
+    device_port = data.get('device_port')
+
+    # Събираме payload-а, който DeviceClientApp очаква
+    # Имената на ключовете тук трябва да съвпадат с тези, които DeviceClientApp очаква
+    # на своя /api/start_task ендпойнт
+    task_payload_for_dc = {
+        "module_serial_numbers": data.get("serial_numbers"),
+        "active_slots": data.get("active_slots"),
+        "item_name": data.get("item_name"),
+        "firmware_details": data.get("task_details")
+    }
+
+    if not all([device_ip, device_port, task_payload_for_dc.get("item_name")]):  # Проверяваме основните
+        emit('ui_notification', {'message': get_translation('error.missingTestData'), 'level': 'error'},
+             room=request.sid)
+        return
+
+    add_log_message("log.initiatingTest", "info", test_name=task_payload_for_dc.get("item_name"), device_ip=device_ip)
+
+    response_from_device = device_communicator.send_task_to_device_client(
+        device_ip,
+        device_port,
+        task_payload_for_dc
+    )
+
+    if response_from_device and response_from_device.get('status') == 'task_accepted_by_device_client':
+        logger.info(f"Командата към DeviceClient ({device_ip}) е приета: {response_from_device}")
+        emit('test_initiation_result', {'success': True, 'message': f"Команда към DeviceClient ({device_ip}) приета."},
+             room=request.sid)
+    else:
+        logger.error(f"Грешка при изпращане на команда към DeviceClient ({device_ip}). Отговор: {response_from_device}")
+        emit('test_initiation_result',
+             {'success': False, 'message': f"Грешка при команда към DeviceClient ({device_ip})."}, room=request.sid)
+
 logger.info("Конфигурацията на Flask приложението и SocketIO е завършена.")
