@@ -70,7 +70,7 @@
             if (type === 'error') p.style.color = '#f87171'; // Tailwind red-400
             if (type === 'success') p.style.color = '#34d399'; // Tailwind green-400
             // Премахваме първото "Очаквам събития...", ако съществува
-            if (testLogPanel.childElementCount === 1 && testLogPanel.firstChild.getAttribute('data-translate-key') === 'testInterface.logWaiting') {
+            if (testLogPanel.childElementCount === 1 && testLogPanel.firstElementChild && testLogPanel.firstElementChild.getAttribute('data-translate-key') === 'testInterface.logWaiting') {
                 testLogPanel.innerHTML = '';
             }
             testLogPanel.appendChild(p);
