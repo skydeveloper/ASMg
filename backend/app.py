@@ -5,7 +5,7 @@ import time
 import logging
 from logging.handlers import RotatingFileHandler
 
-from flask import Flask, render_template, request, session, redirect, url_for
+from flask import Flask, render_template, request, jsonify, session, redirect, url_for
 from flask_socketio import SocketIO, emit
 from flask_cors import CORS
 
@@ -71,6 +71,7 @@ logger.info("TraceabilityAPI client initialized.")
 
 device_communicator = DeviceCommunicator()
 logger.info("DeviceCommunicator initialized.")
+
 
 
 # --- Помощни Функции ---
@@ -310,6 +311,43 @@ def handle_trigger_task_on_device_client(data):
         emit('test_initiation_result', {'success': False,
                                         'message': f"Неуспешно стартиране на задача '{task_payload_for_dc.get('item_name')}' към {device_ip}"},
              room=request.sid)
+
+# ДОБАВЕТЕ ТОЗИ КОД В backend/app.py
+
+@app.route('/api/device/report', methods=['POST'])
+def handle_device_report():
+    """
+    Това е новият REST API ендпойнт, който "слуша" за доклади
+    от подчинените приложения (DeviceClientApp).
+    """
+    # 1. Получаваме данните, изпратени като JSON
+    data = request.get_json()
+    if not data:
+        logger.warning(f"Получена е празна заявка към /api/device/report от IP: {request.remote_addr}")
+        return jsonify({"status": "error", "message": "No data received"}), 400
+
+    # 2. Извличаме информацията, която очакваме
+    device_id = data.get('device_id', 'UnknownDevice')
+    report_type = data.get('report_type', 'generic') # напр. 'test_started', 'test_result', 'error_report'
+    message = data.get('message', 'No details provided.')
+    payload = data.get('payload', {}) # Допълнителни данни, напр. резултати от тест
+
+    # 3. Логваме информацията на сървъра за дебъгване
+    logger.info(f"Получен доклад от устройство '{device_id}' (Тип: {report_type}): {message}")
+    if payload:
+        logger.debug(f"Допълнителни данни (payload) от '{device_id}': {payload}")
+
+    # 4. КЛЮЧОВА СТЪПКА: Излъчваме събитие към браузъра чрез SocketIO
+    # Това ще позволи на test_interface.html да се актуализира в реално време.
+    socketio.emit('device_report_received', {
+        'device_id': device_id,
+        'report_type': report_type,
+        'message': message,
+        'payload': payload
+    })
+
+    # 5. Връщаме отговор на DeviceClientApp, че сме получили доклада успешно
+    return jsonify({"status": "report_received_ok"}), 200
 
 
 logger.info("Конфигурацията на Flask приложението и SocketIO е завършена.")

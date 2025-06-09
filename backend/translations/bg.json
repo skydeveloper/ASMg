@@ -116,8 +116,7 @@
     "error": {
         "missingTestData": "Липсват данни за стартиране на тест/задача към устройство."
     },
-    "testInterface":
-    {
+"testInterface": {
         "title": "АСМг - Тестов Интерфейс за Устройства",
         "header": "Тестов Интерфейс за Device Clients",
         "sendCommandTitle": "Изпрати команда към Device Client",
@@ -129,6 +128,8 @@
         "slotActive": "Гнездо активно",
         "sendStartCommand": "Изпрати Команда към Device Client (чрез ASMg)",
         "logTitle": "Лог на Тестовия Интерфейс:",
-        "logWaiting": "Очаквам събития..."
+        "logWaiting": "Очаквам събития...",
+        "receivedReportsTitle": "Получени доклади от устройства",
+        "waitingForReports": "Очаквам доклади от подчинени приложения..."
     }
 }

@@ -49,11 +49,18 @@
 
             <button id="btn_trigger_start_task_dc" class="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded-lg" data-translate-key="testInterface.sendStartCommand">{{ translations.get('testInterface.sendStartCommand', 'Изпрати "Старт Задача" към Device Client') }}</button>
         </div>
-
-        <div class="mt-6">
-            <h2 class="text-xl font-semibold text-white mb-2" data-translate-key="testInterface.logTitle">{{ translations.get('testInterface.logTitle', 'Лог на Тестовия Интерфейс:') }}</h2>
-            <div id="test-interface-log" class="bg-gray-800 p-4 rounded-lg h-40 overflow-y-auto text-sm font-mono border border-gray-600">
+            <div class="mt-6">
+                <h2 class="text-xl font-semibold text-white mb-2" data-translate-key="testInterface.logTitle">{{ translations.get('testInterface.logTitle', 'Лог на Тестовия Интерфейс:') }}</h2>
+                <div id="test-interface-log" class="bg-gray-800 p-4 rounded-lg h-40 overflow-y-auto text-sm font-mono border border-gray-600">
                 <p data-translate-key="testInterface.logWaiting">{{ translations.get('testInterface.logWaiting', 'Очаквам събития...') }}</p>
+            </div>
+             <div class="mt-8">
+                <h2 class="text-xl font-semibold text-white mb-2" data-translate-key="testInterface.receivedReportsTitle">
+                    Получени доклади от устройства
+                </h2>
+                <div id="device-reports-log" class="bg-gray-800 p-4 rounded-lg h-60 overflow-y-auto text-sm font-mono border border-gray-600">
+                    <p class="text-gray-500" data-translate-key="testInterface.waitingForReports">Очаквам доклади от подчинени приложения...</p>
+                </div>
             </div>
         </div>
     </div>
@@ -113,6 +120,49 @@
         socket.on('ui_notification', (data) => {
              addTestLog(`ASMg UI Бележка: ${data.message} (Ниво: ${data.level})`, data.level);
         });
+
+        // ДОБАВЕТЕ ТОЗИ JAVASCRIPT КОД в <script> тага на templates/test_interface.html
+
+        const deviceReportsLogPanel = document.getElementById('device-reports-log');
+
+        function addReportLog(logData) {
+            // Премахваме първоначалното съобщение "Очаквам доклади..."
+            if (deviceReportsLogPanel.childElementCount === 1 && deviceReportsLogPanel.firstElementChild && deviceReportsLogPanel.firstElementChild.getAttribute('data-translate-key') === 'testInterface.waitingForReports') {
+                deviceReportsLogPanel.innerHTML = '';
+            }
+
+            const p = document.createElement('p');
+            const timestamp = `[${new Date().toLocaleTimeString()}]`;
+            const deviceId = `[${logData.device_id || 'Unknown'}]`;
+            const reportType = `[${logData.report_type || 'generic'}]`;
+
+            let messageColor = '#e5e7eb'; // default: gray-200
+            if (logData.report_type === 'error_report') {
+                messageColor = '#f87171'; // red-400
+            } else if (logData.report_type === 'test_result' && logData.payload && logData.payload.result === 'PASS') {
+                messageColor = '#34d399'; // green-400
+            }
+
+            p.innerHTML = `<span class="text-gray-500"><span class="math-inline">\{timestamp\}</span\> <span class\="text\-yellow\-400"\></span>{deviceId}</span> <span class="text-cyan-400">${reportType}</span> <span style="color: <span class="math-inline">\{messageColor\};"\></span>{logData.message}</span>`;
+
+            // Ако има и допълнителни данни (payload), ги добавяме като преформатиран JSON
+            if (logData.payload && Object.keys(logData.payload).length > 0) {
+                const pre = document.createElement('pre');
+                pre.className = 'text-xs text-gray-400 bg-gray-900 p-2 rounded-md mt-1 mb-2 ml-4';
+                pre.textContent = JSON.stringify(logData.payload, null, 2);
+                p.appendChild(pre);
+            }
+
+            deviceReportsLogPanel.appendChild(p);
+            deviceReportsLogPanel.scrollTop = deviceReportsLogPanel.scrollHeight;
+        }
+
+        // Нов слушател за доклади от устройства
+        socket.on('device_report_received', (data) => {
+            console.log('Получен доклад от устройство:', data);
+            addReportLog(data);
+        });
+
 
         // Превеждаме статичните елементи при зареждане
         const initialTranslations = {{ translations|tojson }};
